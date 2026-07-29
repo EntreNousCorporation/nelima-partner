@@ -54,13 +54,25 @@ export default defineEventHandler(async (event) => {
     }
 
     const raw = profile._data;
+
+    // Chaque surface n'accepte qu'un type de compte. Un administrateur YPYit passe par le
+    // back-office, un parent par l'application mobile : ni l'un ni l'autre n'a de périmètre
+    // établissement, et les laisser entrer ici afficherait une interface sans données ou,
+    // pire, les données d'un établissement arbitraire.
+    if (raw.userType !== 'ESTABLISHMENT_USER') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: "Ce portail est réservé aux établissements partenaires",
+        });
+    }
+
     const user: SchoolUser = {
         id: raw.id,
         firstName: raw.firstName,
         lastName: raw.lastName,
         username: parsed.data.username,
-        establishmentId: raw.establishment?.id,
-        establishmentName: raw.establishment?.name,
+        establishmentId: raw.establishmentId,
+        establishmentName: raw.establishmentName,
     };
 
     const session = await getSchoolSession(event);
