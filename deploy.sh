@@ -15,7 +15,7 @@ npm run build
 
 echo "==> Envoi"
 ssh "$REMOTE" "mkdir -p $REMOTE_DIR/portal && rm -rf $REMOTE_DIR/portal/.output"
-tar czf - .output | ssh "$REMOTE" "tar xzf - -C $REMOTE_DIR/portal"
+COPYFILE_DISABLE=1 tar czf - .output | ssh "$REMOTE" "tar xzf - -C $REMOTE_DIR/portal"
 scp -q Dockerfile "$REMOTE:$REMOTE_DIR/portal/Dockerfile"
 
 echo "==> Reconstruction de l'image et redémarrage"

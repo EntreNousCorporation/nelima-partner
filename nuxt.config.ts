@@ -1,7 +1,7 @@
 import Aura from '@primeuix/themes/aura';
 
 export default defineNuxtConfig({
-    compatibilityDate: '2024-11-01',
+    compatibilityDate: '2025-07-01',
     devtools: { enabled: true },
 
     // SSR maintenu : avec le pattern BFF, serveur et client voient exactement le même
