@@ -11,6 +11,8 @@ const search = ref('');
 const collecting = ref<string | null>(null);
 const channel = ref('CASH');
 const reference = ref('');
+const payerName = ref('');
+const payerEmail = ref('');
 const feedback = ref('');
 const feedbackError = ref('');
 
@@ -46,9 +48,13 @@ async function collect(installment: Installment) {
             installmentId: installment.id,
             channel: channel.value,
             reference: reference.value || undefined,
+            payerName: payerName.value || undefined,
+            payerEmail: payerEmail.value || undefined,
         });
         feedback.value = `Encaissement enregistré. Reçu ${receipt.number}.`;
         reference.value = '';
+        payerName.value = '';
+        payerEmail.value = '';
         await load();
     } catch (e: any) {
         feedbackError.value = e?.response?._data?.debugMessage
@@ -84,6 +90,24 @@ onMounted(load);
                 <input v-model="reference" type="text" placeholder="N° de chèque, virement…"
                        class="mt-1 block w-56 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
             </label>
+        </div>
+
+        <div class="mt-4 rounded border border-black/10 dark:border-white/15 p-4">
+            <p class="text-sm font-medium">Personne qui règle</p>
+            <p class="text-sm opacity-70 mt-1 mb-3">
+                Le reçu est toujours envoyé au tuteur enregistré de l'élève. Renseignez ces champs
+                si quelqu'un d'autre règle : le reçu portera son nom et lui sera également envoyé.
+            </p>
+            <div class="flex flex-wrap gap-4">
+                <label class="text-sm">Nom
+                    <input v-model="payerName" type="text" placeholder="Jean Kouassi"
+                           class="mt-1 block w-56 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                </label>
+                <label class="text-sm">Email
+                    <input v-model="payerEmail" type="email" placeholder="parent@example.com"
+                           class="mt-1 block w-72 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                </label>
+            </div>
         </div>
 
         <p v-if="feedback" class="mt-4 text-sm text-nelima-600">{{ feedback }}</p>
