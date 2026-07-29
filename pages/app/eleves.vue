@@ -16,6 +16,45 @@ const selectedLevel = ref<string>('');
 const loading = ref(false);
 const loadError = ref('');
 
+const showImport = ref(false);
+const importing = ref(false);
+const importError = ref('');
+const importMessage = ref('');
+const importFile = ref<File | null>(null);
+
+function onFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    importFile.value = input.files?.[0] ?? null;
+}
+
+async function submitImport() {
+    if (!importFile.value) return;
+    importError.value = '';
+    importMessage.value = '';
+    importing.value = true;
+    try {
+        const body = new FormData();
+        body.append('file', importFile.value);
+        // Pas de Content-Type explicite : le navigateur doit poser lui-même la frontière
+        // multipart, la fixer à la main casserait la requête.
+        const report = await $fetch<{ imported: number }>('/api/v1/students/import-csv', {
+            method: 'POST', body,
+        });
+        importMessage.value = `${report.imported} élève(s) importé(s).`;
+        importFile.value = null;
+        showImport.value = false;
+        page.value = 0;
+        await load();
+    } catch (e: any) {
+        // Le rapport du serveur désigne les lignes fautives : on le montre tel quel, c'est la
+        // seule information qui permet à l'école de corriger son fichier.
+        importError.value = e?.response?._data?.debugMessage
+            ?? "Le fichier n'a pas pu être importé.";
+    } finally {
+        importing.value = false;
+    }
+}
+
 const showForm = ref(false);
 const saving = ref(false);
 const formError = ref('');
@@ -109,13 +148,37 @@ onMounted(async () => {
                     {{ totalElements }} élève{{ totalElements > 1 ? 's' : '' }} inscrit{{ totalElements > 1 ? 's' : '' }}
                 </p>
             </div>
-            <button
-                class="rounded bg-nelima-600 px-4 py-2 text-white"
-                @click="showForm = !showForm"
-            >
-                {{ showForm ? 'Annuler' : 'Nouvel élève' }}
-            </button>
+            <div class="flex gap-2">
+                <button class="rounded border border-black/20 dark:border-white/20 px-4 py-2"
+                        @click="showImport = !showImport; showForm = false">
+                    {{ showImport ? 'Annuler' : 'Importer un fichier' }}
+                </button>
+                <button class="rounded bg-nelima-600 px-4 py-2 text-white"
+                        @click="showForm = !showForm; showImport = false">
+                    {{ showForm ? 'Annuler' : 'Nouvel élève' }}
+                </button>
+            </div>
         </div>
+
+        <form v-if="showImport" class="mt-6 rounded border border-black/10 dark:border-white/15 p-4"
+              @submit.prevent="submitImport">
+            <h2 class="font-medium mb-2">Importer une liste d'élèves</h2>
+            <p class="text-sm opacity-70 mb-4">
+                Fichier CSV séparé par des points-virgules, avec cet en-tête exact :<br />
+                <code class="text-xs">matricule;nom;prenom;date_naissance;lieu_naissance;niveau</code><br />
+                Les dates s'écrivent AAAA-MM-JJ, et le niveau doit être l'un de ceux que vous avez
+                déclarés. L'import est tout ou rien : si une ligne est invalide, rien n'est enregistré.
+            </p>
+            <input type="file" accept=".csv,text/csv" required
+                   class="block text-sm" @change="onFileChange" />
+            <p v-if="importError" class="mt-3 text-sm text-red-600" role="alert">{{ importError }}</p>
+            <button type="submit" :disabled="importing || !importFile"
+                    class="mt-4 rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50">
+                {{ importing ? 'Import en cours…' : 'Importer' }}
+            </button>
+        </form>
+
+        <p v-if="importMessage" class="mt-4 text-sm text-nelima-600">{{ importMessage }}</p>
 
         <form
             v-if="showForm"
