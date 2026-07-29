@@ -6,6 +6,7 @@ const route = useRoute();
 
 const navigation = [
     { label: 'Tableau de bord', to: '/app' },
+    { label: 'Niveaux', to: '/app/niveaux' },
     { label: 'Élèves', to: '/app/eleves' },
     { label: 'Frais', to: '/app/frais' },
     { label: 'Encaissement', to: '/app/encaissement' },
