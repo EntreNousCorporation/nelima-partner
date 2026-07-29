@@ -43,12 +43,13 @@ onMounted(async () => {
                         <th class="py-2 pr-4 font-medium">Matricule</th>
                         <th class="py-2 pr-4 font-medium">Payeur</th>
                         <th class="py-2 pr-4 font-medium">Montant</th>
+                        <th class="py-2 pr-4 font-medium"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-if="loading"><td colspan="6" class="py-6 opacity-70">Chargement…</td></tr>
+                    <tr v-if="loading"><td colspan="7" class="py-6 opacity-70">Chargement…</td></tr>
                     <tr v-else-if="!rows.length">
-                        <td colspan="6" class="py-6 opacity-70">Aucun reçu émis pour l'instant.</td>
+                        <td colspan="7" class="py-6 opacity-70">Aucun reçu émis pour l'instant.</td>
                     </tr>
                     <tr v-for="row in rows" :key="row.id" class="border-b border-black/5 dark:border-white/10">
                         <td class="py-2 pr-4 font-mono">{{ row.number }}</td>
@@ -57,6 +58,10 @@ onMounted(async () => {
                         <td class="py-2 pr-4 font-mono">{{ row.studentRegistrationNumber ?? '—' }}</td>
                         <td class="py-2 pr-4">{{ row.payerLabel || '—' }}</td>
                         <td class="py-2 pr-4">{{ formatAmount(row.amount) }}</td>
+                        <td class="py-2 pr-4">
+                            <a :href="`/api/v1/receipts/${row.id}/pdf`" target="_blank"
+                               class="underline text-sm">PDF</a>
+                        </td>
                     </tr>
                 </tbody>
             </table>
