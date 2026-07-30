@@ -31,7 +31,7 @@ onMounted(async () => {
 
 <template>
     <div>
-        <h1 class="text-2xl font-semibold">Impayés</h1>
+        <h1 class="page-title">Impayés</h1>
         <p class="mt-1 opacity-70 max-w-2xl">
             Tranches dont l'échéance est dépassée et qui restent dues.
         </p>
@@ -41,31 +41,31 @@ onMounted(async () => {
             <strong>{{ formatAmount(total) }}</strong>
         </p>
 
-        <p v-if="error" class="mt-4 text-sm text-red-600" role="alert">{{ error }}</p>
+        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
+        <div class="table-wrap mt-4">
+            <table class="table">
                 <thead>
-                    <tr class="text-left border-b border-black/10 dark:border-white/15">
-                        <th class="py-2 pr-4 font-medium">Matricule</th>
-                        <th class="py-2 pr-4 font-medium">Élève</th>
-                        <th class="py-2 pr-4 font-medium">Tranche</th>
-                        <th class="py-2 pr-4 font-medium">Montant</th>
-                        <th class="py-2 pr-4 font-medium">Échéance</th>
-                        <th class="py-2 pr-4 font-medium">Retard</th>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Élève</th>
+                        <th>Tranche</th>
+                        <th>Montant</th>
+                        <th>Échéance</th>
+                        <th>Retard</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-if="loading"><td colspan="6" class="py-6 opacity-70">Chargement…</td></tr>
+                    <tr v-if="loading"><td colspan="6" class="py-8 text-center" style="color: var(--text-muted)">Chargement…</td></tr>
                     <tr v-else-if="!rows.length">
-                        <td colspan="6" class="py-6 opacity-70">Aucun impayé. Tout est à jour.</td>
+                        <td colspan="6" class="py-8 text-center" style="color: var(--text-muted)">Aucun impayé. Tout est à jour.</td>
                     </tr>
-                    <tr v-for="row in rows" :key="row.id" class="border-b border-black/5 dark:border-white/10">
-                        <td class="py-2 pr-4 font-mono">{{ studentOf(row).matricule }}</td>
-                        <td class="py-2 pr-4">{{ studentOf(row).name }}</td>
-                        <td class="py-2 pr-4">{{ row.label ?? '—' }}</td>
-                        <td class="py-2 pr-4">{{ formatAmount(row.amount) }}</td>
-                        <td class="py-2 pr-4">{{ formatDate(row.dueDate) }}</td>
+                    <tr v-for="row in rows" :key="row.id" >
+                        <td class="font-mono">{{ studentOf(row).matricule }}</td>
+                        <td>{{ studentOf(row).name }}</td>
+                        <td>{{ row.label ?? '—' }}</td>
+                        <td>{{ formatAmount(row.amount) }}</td>
+                        <td>{{ formatDate(row.dueDate) }}</td>
                         <td class="py-2 pr-4 text-red-600">{{ daysLate(row.dueDate) }} j</td>
                     </tr>
                 </tbody>

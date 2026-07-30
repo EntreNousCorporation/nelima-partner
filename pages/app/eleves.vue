@@ -141,28 +141,28 @@ onMounted(async () => {
 
 <template>
     <div>
-        <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="page-header">
             <div>
-                <h1 class="text-2xl font-semibold">Élèves</h1>
-                <p class="mt-1 opacity-70">
+                <h1 class="page-title">Élèves</h1>
+                <p class="page-subtitle">
                     {{ totalElements }} élève{{ totalElements > 1 ? 's' : '' }} inscrit{{ totalElements > 1 ? 's' : '' }}
                 </p>
             </div>
             <div class="flex gap-2">
-                <button class="rounded border border-black/20 dark:border-white/20 px-4 py-2"
+                <button class="btn-secondary"
                         @click="showImport = !showImport; showForm = false">
                     {{ showImport ? 'Annuler' : 'Importer un fichier' }}
                 </button>
-                <button class="rounded bg-nelima-600 px-4 py-2 text-white"
+                <button class="btn-primary"
                         @click="showForm = !showForm; showImport = false">
                     {{ showForm ? 'Annuler' : 'Nouvel élève' }}
                 </button>
             </div>
         </div>
 
-        <form v-if="showImport" class="mt-6 rounded border border-black/10 dark:border-white/15 p-4"
+        <form v-if="showImport" class="card-pad mt-6"
               @submit.prevent="submitImport">
-            <h2 class="font-medium mb-2">Importer une liste d'élèves</h2>
+            <h2 class="section-title">Importer une liste d'élèves</h2>
             <p class="text-sm opacity-70 mb-4">
                 Fichier CSV séparé par des points-virgules, avec cet en-tête exact :<br />
                 <code class="text-xs">matricule;nom;prenom;date_naissance;lieu_naissance;niveau</code><br />
@@ -171,49 +171,49 @@ onMounted(async () => {
             </p>
             <input type="file" accept=".csv,text/csv" required
                    class="block text-sm" @change="onFileChange" />
-            <p v-if="importError" class="mt-3 text-sm text-red-600" role="alert">{{ importError }}</p>
+            <p v-if="importError" class="alert-danger mt-3" role="alert">{{ importError }}</p>
             <button type="submit" :disabled="importing || !importFile"
-                    class="mt-4 rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50">
+                    class="btn-primary mt-4">
                 {{ importing ? 'Import en cours…' : 'Importer' }}
             </button>
         </form>
 
-        <p v-if="importMessage" class="mt-4 text-sm text-nelima-600">{{ importMessage }}</p>
+        <p v-if="importMessage" class="alert-success mt-4">{{ importMessage }}</p>
 
         <form
             v-if="showForm"
-            class="mt-6 rounded border border-black/10 dark:border-white/15 p-4"
+            class="card-pad mt-6"
             @submit.prevent="submit"
         >
-            <h2 class="font-medium mb-4">Nouvel élève</h2>
+            <h2 class="section-title">Nouvel élève</h2>
             <p v-if="!levelOptions.length" class="mb-4 text-sm">
                 Aucun niveau n'est déclaré pour votre établissement. Renseignez-les d'abord dans
                 <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
             </p>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <label class="text-sm">Prénom
+                <label class="field-label">Prénom
                     <input v-model="form.firstName" type="text" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Nom
+                <label class="field-label">Nom
                     <input v-model="form.lastName" type="text" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Matricule
+                <label class="field-label">Matricule
                     <input v-model="form.registrationNumber" type="text" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Date de naissance
+                <label class="field-label">Date de naissance
                     <input v-model="form.birthDay" type="date" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Lieu de naissance
+                <label class="field-label">Lieu de naissance
                     <input v-model="form.placeOfBirth" type="text" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Niveau
+                <label class="field-label">Niveau
                     <select v-model="form.levelOfStudyCode" required
-                            class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2">
+                            class="select mt-1">
                         <option value="" disabled>Choisir…</option>
                         <option v-for="level in levelOptions" :key="level.id" :value="level.code">
                             {{ levelLabel(level) }}
@@ -222,20 +222,20 @@ onMounted(async () => {
                 </label>
             </div>
 
-            <p v-if="formError" class="mt-4 text-sm text-red-600" role="alert">{{ formError }}</p>
+            <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
 
             <div class="mt-4">
                 <button type="submit" :disabled="saving || !formComplete"
-                        class="rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50">
+                        class="btn-primary">
                     {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                 </button>
             </div>
         </form>
 
         <div class="mt-6 flex items-center gap-3">
-            <label class="text-sm">Niveau
+            <label class="field-label">Niveau
                 <select v-model="selectedLevel"
-                        class="ml-2 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-1.5">
+                        class="select w-auto">
                     <option value="">Tous</option>
                     <option v-for="level in levelOptions" :key="level.id" :value="level.code">
                         {{ levelLabel(level) }}
@@ -244,45 +244,45 @@ onMounted(async () => {
             </label>
         </div>
 
-        <p v-if="loadError" class="mt-4 text-sm text-red-600" role="alert">{{ loadError }}</p>
+        <p v-if="loadError" class="alert-danger mt-4" role="alert">{{ loadError }}</p>
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
+        <div class="table-wrap mt-4">
+            <table class="table">
                 <thead>
-                    <tr class="text-left border-b border-black/10 dark:border-white/15">
-                        <th class="py-2 pr-4 font-medium">Matricule</th>
-                        <th class="py-2 pr-4 font-medium">Nom</th>
-                        <th class="py-2 pr-4 font-medium">Prénom</th>
-                        <th class="py-2 pr-4 font-medium">Niveau</th>
-                        <th class="py-2 pr-4 font-medium">Naissance</th>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Nom</th>
+                        <th>Prénom</th>
+                        <th>Niveau</th>
+                        <th>Naissance</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="loading">
-                        <td colspan="5" class="py-6 opacity-70">Chargement…</td>
+                        <td colspan="5" class="py-8 text-center" style="color: var(--text-muted)">Chargement…</td>
                     </tr>
                     <tr v-else-if="!students.length">
-                        <td colspan="5" class="py-6 opacity-70">
+                        <td colspan="5" class="py-8 text-center" style="color: var(--text-muted)">
                             Aucun élève pour l'instant. Utilisez « Nouvel élève » pour en ajouter un.
                         </td>
                     </tr>
                     <tr v-for="student in students" :key="student.id"
-                        class="border-b border-black/5 dark:border-white/10">
-                        <td class="py-2 pr-4 font-mono">{{ student.registrationNumber }}</td>
-                        <td class="py-2 pr-4">{{ student.lastName }}</td>
-                        <td class="py-2 pr-4">{{ student.firstName }}</td>
-                        <td class="py-2 pr-4">{{ levelLabel(student.levelOfStudy) }}</td>
-                        <td class="py-2 pr-4">{{ formatDate(student.birthDay) }}</td>
+                        >
+                        <td class="font-mono">{{ student.registrationNumber }}</td>
+                        <td>{{ student.lastName }}</td>
+                        <td>{{ student.firstName }}</td>
+                        <td>{{ levelLabel(student.levelOfStudy) }}</td>
+                        <td>{{ formatDate(student.birthDay) }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
         <div v-if="totalPages > 1" class="mt-4 flex items-center gap-3 text-sm">
-            <button class="rounded border border-black/20 dark:border-white/20 px-3 py-1 disabled:opacity-40"
+            <button class="btn-secondary btn-sm"
                     :disabled="page === 0" @click="changePage(-1)">Précédent</button>
             <span class="opacity-70">Page {{ page + 1 }} sur {{ totalPages }}</span>
-            <button class="rounded border border-black/20 dark:border-white/20 px-3 py-1 disabled:opacity-40"
+            <button class="btn-secondary btn-sm"
                     :disabled="page >= totalPages - 1" @click="changePage(1)">Suivant</button>
         </div>
     </div>

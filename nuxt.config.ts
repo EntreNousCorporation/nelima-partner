@@ -45,7 +45,21 @@ export default defineNuxtConfig({
         head: {
             htmlAttrs: { lang: 'fr' },
             title: 'Nelima — Espace établissement',
-            meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
+            meta: [
+                { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+                { name: 'theme-color', content: '#2547eb' },
+            ],
+            // Police chargée depuis un CDN et non par le paquet `@fontsource` : celui-ci utilise
+            // `import.meta` d'une façon que le scan SSR de Vite ne sait pas transpiler, et casse
+            // le build. `preconnect` évite d'attendre la résolution DNS au premier rendu.
+            link: [
+                { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+                { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+                {
+                    rel: 'stylesheet',
+                    href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+                },
+            ],
         },
     },
 });

@@ -21,7 +21,7 @@ onMounted(async () => {
 
 <template>
     <div>
-        <h1 class="text-2xl font-semibold">Reçus</h1>
+        <h1 class="page-title">Reçus</h1>
         <p class="mt-1 opacity-70 max-w-2xl">
             Tous les encaissements quittancés, guichet et paiements en ligne confondus. La
             numérotation est continue et propre à votre établissement.
@@ -31,34 +31,34 @@ onMounted(async () => {
             {{ rows.length }} reçu{{ rows.length > 1 ? 's' : '' }} — <strong>{{ formatAmount(total) }}</strong>
         </p>
 
-        <p v-if="error" class="mt-4 text-sm text-red-600" role="alert">{{ error }}</p>
+        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
+        <div class="table-wrap mt-4">
+            <table class="table">
                 <thead>
-                    <tr class="text-left border-b border-black/10 dark:border-white/15">
-                        <th class="py-2 pr-4 font-medium">Numéro</th>
-                        <th class="py-2 pr-4 font-medium">Date</th>
-                        <th class="py-2 pr-4 font-medium">Élève</th>
-                        <th class="py-2 pr-4 font-medium">Matricule</th>
-                        <th class="py-2 pr-4 font-medium">Payeur</th>
-                        <th class="py-2 pr-4 font-medium">Montant</th>
-                        <th class="py-2 pr-4 font-medium"></th>
+                    <tr>
+                        <th>Numéro</th>
+                        <th>Date</th>
+                        <th>Élève</th>
+                        <th>Matricule</th>
+                        <th>Payeur</th>
+                        <th>Montant</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-if="loading"><td colspan="7" class="py-6 opacity-70">Chargement…</td></tr>
+                    <tr v-if="loading"><td colspan="7" class="py-8 text-center" style="color: var(--text-muted)">Chargement…</td></tr>
                     <tr v-else-if="!rows.length">
-                        <td colspan="7" class="py-6 opacity-70">Aucun reçu émis pour l'instant.</td>
+                        <td colspan="7" class="py-8 text-center" style="color: var(--text-muted)">Aucun reçu émis pour l'instant.</td>
                     </tr>
-                    <tr v-for="row in rows" :key="row.id" class="border-b border-black/5 dark:border-white/10">
-                        <td class="py-2 pr-4 font-mono">{{ row.number }}</td>
-                        <td class="py-2 pr-4">{{ formatDate(row.issuedAt) }}</td>
-                        <td class="py-2 pr-4">{{ row.studentLabel ?? '—' }}</td>
-                        <td class="py-2 pr-4 font-mono">{{ row.studentRegistrationNumber ?? '—' }}</td>
-                        <td class="py-2 pr-4">{{ row.payerLabel || '—' }}</td>
-                        <td class="py-2 pr-4">{{ formatAmount(row.amount) }}</td>
-                        <td class="py-2 pr-4">
+                    <tr v-for="row in rows" :key="row.id" >
+                        <td class="font-mono">{{ row.number }}</td>
+                        <td>{{ formatDate(row.issuedAt) }}</td>
+                        <td>{{ row.studentLabel ?? '—' }}</td>
+                        <td class="font-mono">{{ row.studentRegistrationNumber ?? '—' }}</td>
+                        <td>{{ row.payerLabel || '—' }}</td>
+                        <td>{{ formatAmount(row.amount) }}</td>
+                        <td>
                             <a :href="`/api/v1/receipts/${row.id}/pdf`" target="_blank"
                                class="underline text-sm">PDF</a>
                         </td>

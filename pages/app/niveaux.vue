@@ -74,21 +74,21 @@ onMounted(load);
 
 <template>
     <div>
-        <h1 class="text-2xl font-semibold">Niveaux enseignés</h1>
+        <h1 class="page-title">Niveaux enseignés</h1>
         <p class="mt-1 opacity-70 max-w-2xl">
             Sélectionnez les niveaux proposés par votre établissement. Un élève ne peut être inscrit
             que dans un niveau déclaré ici, et les frais se ciblent par niveau.
         </p>
 
-        <p v-if="error" class="mt-4 text-sm text-red-600" role="alert">{{ error }}</p>
-        <p v-if="message" class="mt-4 text-sm text-nelima-600">{{ message }}</p>
+        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
+        <p v-if="message" class="alert-success mt-4">{{ message }}</p>
 
         <p v-if="loading" class="mt-6 opacity-70">Chargement…</p>
 
         <div v-else class="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
             <label
                 v-for="level in catalogue" :key="level.id"
-                class="flex items-center gap-2 rounded border border-black/10 dark:border-white/15 px-3 py-2 cursor-pointer"
+                class="flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer" style="border: 1px solid var(--border)"
                 :class="selected.includes(level.code) ? 'bg-nelima-50 dark:bg-white/10 border-nelima-300' : ''"
             >
                 <input
@@ -101,7 +101,7 @@ onMounted(load);
 
         <div v-if="!loading" class="mt-6 flex items-center gap-3">
             <button
-                class="rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50"
+                class="btn-primary"
                 :disabled="saving || !dirty || !selected.length"
                 @click="save"
             >

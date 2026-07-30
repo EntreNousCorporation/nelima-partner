@@ -69,76 +69,76 @@ onMounted(load);
 
 <template>
     <div>
-        <h1 class="text-2xl font-semibold">Encaissement</h1>
+        <h1 class="page-title">Encaissement</h1>
         <p class="mt-1 opacity-70 max-w-2xl">
             Enregistrez un règlement reçu au guichet. Le reçu est émis immédiatement et numéroté.
             Aucune commission n'est prélevée sur ce canal.
         </p>
 
         <div class="mt-6 flex flex-wrap items-end gap-4">
-            <label class="text-sm">Rechercher
+            <label class="field-label">Rechercher
                 <input v-model="search" type="search" placeholder="Nom ou matricule"
-                       class="mt-1 block w-64 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                       class="input mt-1 w-64" />
             </label>
-            <label class="text-sm">Mode de règlement
+            <label class="field-label">Mode de règlement
                 <select v-model="channel"
-                        class="mt-1 block rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2">
+                        class="select mt-1 w-auto">
                     <option v-for="c in CHANNELS" :key="c.value" :value="c.value">{{ c.label }}</option>
                 </select>
             </label>
-            <label class="text-sm">Référence
+            <label class="field-label">Référence
                 <input v-model="reference" type="text" placeholder="N° de chèque, virement…"
-                       class="mt-1 block w-56 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                       class="input mt-1 w-56" />
             </label>
         </div>
 
-        <div class="mt-4 rounded border border-black/10 dark:border-white/15 p-4">
+        <div class="card-pad mt-4">
             <p class="text-sm font-medium">Personne qui règle</p>
             <p class="text-sm opacity-70 mt-1 mb-3">
                 Le reçu est toujours envoyé au tuteur enregistré de l'élève. Renseignez ces champs
                 si quelqu'un d'autre règle : le reçu portera son nom et lui sera également envoyé.
             </p>
             <div class="flex flex-wrap gap-4">
-                <label class="text-sm">Nom
+                <label class="field-label">Nom
                     <input v-model="payerName" type="text" placeholder="Jean Kouassi"
-                           class="mt-1 block w-56 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1 w-56" />
                 </label>
-                <label class="text-sm">Email
+                <label class="field-label">Email
                     <input v-model="payerEmail" type="email" placeholder="parent@example.com"
-                           class="mt-1 block w-72 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1 w-72" />
                 </label>
             </div>
         </div>
 
-        <p v-if="feedback" class="mt-4 text-sm text-nelima-600">{{ feedback }}</p>
-        <p v-if="feedbackError" class="mt-4 text-sm text-red-600" role="alert">{{ feedbackError }}</p>
-        <p v-if="error" class="mt-4 text-sm text-red-600" role="alert">{{ error }}</p>
+        <p v-if="feedback" class="alert-success mt-4">{{ feedback }}</p>
+        <p v-if="feedbackError" class="alert-danger mt-4" role="alert">{{ feedbackError }}</p>
+        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
+        <div class="table-wrap mt-4">
+            <table class="table">
                 <thead>
-                    <tr class="text-left border-b border-black/10 dark:border-white/15">
-                        <th class="py-2 pr-4 font-medium">Matricule</th>
-                        <th class="py-2 pr-4 font-medium">Élève</th>
-                        <th class="py-2 pr-4 font-medium">Tranche</th>
-                        <th class="py-2 pr-4 font-medium">Montant</th>
-                        <th class="py-2 pr-4 font-medium">Échéance</th>
-                        <th class="py-2 pr-4 font-medium"></th>
+                    <tr>
+                        <th>Matricule</th>
+                        <th>Élève</th>
+                        <th>Tranche</th>
+                        <th>Montant</th>
+                        <th>Échéance</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-if="loading"><td colspan="6" class="py-6 opacity-70">Chargement…</td></tr>
+                    <tr v-if="loading"><td colspan="6" class="py-8 text-center" style="color: var(--text-muted)">Chargement…</td></tr>
                     <tr v-else-if="!filtered.length">
-                        <td colspan="6" class="py-6 opacity-70">Aucune tranche à encaisser.</td>
+                        <td colspan="6" class="py-8 text-center" style="color: var(--text-muted)">Aucune tranche à encaisser.</td>
                     </tr>
-                    <tr v-for="row in filtered" :key="row.id" class="border-b border-black/5 dark:border-white/10">
-                        <td class="py-2 pr-4 font-mono">{{ studentOf(row).matricule }}</td>
-                        <td class="py-2 pr-4">{{ studentOf(row).name }}</td>
-                        <td class="py-2 pr-4">{{ row.label ?? '—' }}</td>
-                        <td class="py-2 pr-4">{{ formatAmount(row.amount) }}</td>
-                        <td class="py-2 pr-4">{{ formatDate(row.dueDate) }}</td>
-                        <td class="py-2 pr-4">
-                            <button class="rounded bg-nelima-600 px-3 py-1.5 text-white disabled:opacity-50"
+                    <tr v-for="row in filtered" :key="row.id" >
+                        <td class="font-mono">{{ studentOf(row).matricule }}</td>
+                        <td>{{ studentOf(row).name }}</td>
+                        <td>{{ row.label ?? '—' }}</td>
+                        <td>{{ formatAmount(row.amount) }}</td>
+                        <td>{{ formatDate(row.dueDate) }}</td>
+                        <td>
+                            <button class="btn-primary btn-sm"
                                     :disabled="collecting === row.id" @click="collect(row)">
                                 {{ collecting === row.id ? 'En cours…' : 'Encaisser' }}
                             </button>

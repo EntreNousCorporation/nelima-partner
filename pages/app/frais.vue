@@ -165,34 +165,34 @@ onMounted(async () => {
 
 <template>
     <div>
-        <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="page-header">
             <div>
-                <h1 class="text-2xl font-semibold">Frais</h1>
+                <h1 class="page-title">Frais</h1>
                 <p class="mt-1 opacity-70 max-w-2xl">
                     Un frais s'applique aux élèves des niveaux ciblés. Son échéancier détermine
                     les tranches que les familles auront à régler.
                 </p>
             </div>
-            <button class="rounded bg-nelima-600 px-4 py-2 text-white" @click="showForm = !showForm">
+            <button class="btn-primary" @click="showForm = !showForm">
                 {{ showForm ? 'Annuler' : 'Nouveau frais' }}
             </button>
         </div>
 
-        <form v-if="showForm" class="mt-6 rounded border border-black/10 dark:border-white/15 p-4"
+        <form v-if="showForm" class="card-pad mt-6"
               @submit.prevent="submit">
-            <h2 class="font-medium mb-4">Nouveau frais</h2>
+            <h2 class="section-title">Nouveau frais</h2>
             <p v-if="!levelOptions.length" class="mb-4 text-sm">
                 Aucun niveau déclaré. Renseignez d'abord
                 <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
             </p>
             <div class="grid gap-4 sm:grid-cols-2">
-                <label class="text-sm">Libellé
+                <label class="field-label">Libellé
                     <input v-model="form.name" type="text" required placeholder="Scolarité annuelle"
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
-                <label class="text-sm">Montant total (FCFA)
+                <label class="field-label">Montant total (FCFA)
                     <input v-model="form.price" type="number" min="1" required
-                           class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                           class="input mt-1" />
                 </label>
             </div>
 
@@ -200,7 +200,7 @@ onMounted(async () => {
                 <legend class="text-sm mb-2">Niveaux concernés</legend>
                 <div class="flex flex-wrap gap-2">
                     <label v-for="level in levelOptions" :key="level.id"
-                           class="flex items-center gap-2 rounded border border-black/10 dark:border-white/15 px-3 py-1.5 text-sm cursor-pointer"
+                           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer" style="border: 1px solid var(--border)"
                            :class="form.levelOfStudiesCodes.includes(level.code) ? 'bg-nelima-50 dark:bg-white/10 border-nelima-300' : ''">
                         <input type="checkbox" :checked="form.levelOfStudiesCodes.includes(level.code)"
                                @change="toggleLevel(level.code)" />
@@ -218,16 +218,16 @@ onMounted(async () => {
                 </label>
             </div>
 
-            <p v-if="formError" class="mt-4 text-sm text-red-600" role="alert">{{ formError }}</p>
+            <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
 
             <button type="submit"
                     :disabled="saving || !form.name || !form.price || !form.levelOfStudiesCodes.length"
-                    class="mt-4 rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50">
+                    class="btn-primary mt-4">
                 {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
             </button>
         </form>
 
-        <p v-if="error" class="mt-4 text-sm text-red-600" role="alert">{{ error }}</p>
+        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
         <p v-if="loading" class="mt-6 opacity-70">Chargement…</p>
 
         <div v-else-if="!fees.length" class="mt-6 opacity-70">
@@ -236,8 +236,8 @@ onMounted(async () => {
 
         <div v-else class="mt-6 space-y-3">
             <div v-for="fee in fees" :key="fee.id"
-                 class="rounded border border-black/10 dark:border-white/15 p-4">
-                <div class="flex items-start justify-between gap-4 flex-wrap">
+                 class="card-pad">
+                <div class="page-header">
                     <div>
                         <p class="font-medium">
                             {{ fee.name }}
@@ -248,26 +248,26 @@ onMounted(async () => {
                             {{ (fee.levelOfStudies ?? []).map(levelLabel).join(', ') || 'Aucun niveau' }}
                         </p>
                     </div>
-                    <button class="rounded border border-black/20 dark:border-white/20 px-3 py-1.5 text-sm"
+                    <button class="btn-secondary btn-sm"
                             @click="editing?.id === fee.id ? (editing = null) : openSchedules(fee)">
                         {{ editing?.id === fee.id ? 'Fermer' : 'Échéancier' }}
                     </button>
                 </div>
 
-                <div v-if="editing?.id === fee.id" class="mt-4 border-t border-black/10 dark:border-white/15 pt-4">
+                <div v-if="editing?.id === fee.id" class="mt-4 pt-4" style="border-top: 1px solid var(--border)">
                     <div v-for="(schedule, index) in schedules" :key="index"
                          class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end mb-3">
-                        <label class="text-sm">Libellé
+                        <label class="field-label">Libellé
                             <input v-model="schedule.label" type="text"
-                                   class="mt-1 w-full rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                                   class="input mt-1" />
                         </label>
-                        <label class="text-sm">Montant
+                        <label class="field-label">Montant
                             <input v-model="schedule.amount" type="number" min="1"
-                                   class="mt-1 w-36 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                                   class="input mt-1 w-36" />
                         </label>
-                        <label class="text-sm">Échéance
+                        <label class="field-label">Échéance
                             <input v-model="schedule.dueDate" type="date"
-                                   class="mt-1 rounded border border-black/20 dark:border-white/20 bg-transparent px-3 py-2" />
+                                   class="input mt-1" />
                         </label>
                         <button type="button" class="text-sm underline opacity-70 pb-2"
                                 @click="removeSchedule(index)">Retirer</button>
@@ -285,10 +285,10 @@ onMounted(async () => {
                     </p>
 
                     <p v-if="scheduleError" class="mt-2 text-sm text-red-600" role="alert">{{ scheduleError }}</p>
-                    <p v-if="scheduleMessage" class="mt-2 text-sm text-nelima-600">{{ scheduleMessage }}</p>
+                    <p v-if="scheduleMessage" class="alert-success mt-2">{{ scheduleMessage }}</p>
 
                     <button type="button" :disabled="savingSchedules || !schedules.length || !totalMatches"
-                            class="mt-3 rounded bg-nelima-600 px-4 py-2 text-white disabled:opacity-50"
+                            class="btn-primary mt-3"
                             @click="saveSchedules">
                         {{ savingSchedules ? 'Enregistrement…' : "Enregistrer l'échéancier" }}
                     </button>
