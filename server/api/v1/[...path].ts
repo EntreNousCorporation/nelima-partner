@@ -66,15 +66,19 @@ export default defineEventHandler(async (event) => {
         ? undefined
         : await readRawBody(event, false);
 
-    // responseType 'text' et non 'arrayBuffer' : Nitro re-sérialiserait le binaire et le
-    // corps arriverait vide côté navigateur.
-    const response = await $fetch.raw<string>(`${config.backendUrl}/${path}`, {
+    // Toujours lu en binaire, puis décodé — ou non — selon ce que le backend annonce.
+    //
+    // Lire en `text` décodait le PDF d'un reçu comme de l'UTF-8 : chaque octet invalide était
+    // remplacé, et le fichier téléchargé arrivait vide. Lire en binaire et rendre un `Buffer`
+    // est le seul moyen de traverser le proxy sans altération ; le JSON, lui, doit rester une
+    // chaîne, faute de quoi il arriverait au navigateur sous forme d'objet sérialisé.
+    const response = await $fetch.raw<ArrayBuffer>(`${config.backendUrl}/${path}`, {
         method: method as any,
         body: rawBody,
         query: getQuery(event) as Record<string, string>,
         headers: forwardHeaders,
         ignoreResponseError: true,
-        responseType: 'text',
+        responseType: 'arrayBuffer',
     });
 
     setResponseStatus(event, response.status);
@@ -89,5 +93,14 @@ export default defineEventHandler(async (event) => {
         await session.clear();
     }
 
-    return !response._data || response._data === '' ? null : response._data;
+    if (!response._data || response._data.byteLength === 0) {
+        return null;
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const isTextual = /^(application\/(json|.*\+json|xml)|text\/)/i.test(contentType);
+
+    return isTextual
+        ? new TextDecoder('utf-8').decode(response._data)
+        : Buffer.from(response._data);
 });
