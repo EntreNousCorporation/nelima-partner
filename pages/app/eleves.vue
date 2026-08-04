@@ -17,6 +17,9 @@ const keyword = ref('');
 const loading = ref(false);
 const loadError = ref('');
 
+/** Élève dont la fiche est ouverte en tiroir. */
+const opened = ref<Student | null>(null);
+
 const showImport = ref(false);
 const importing = ref(false);
 const importError = ref('');
@@ -140,6 +143,10 @@ watch(keyword, () => {
 watch(selectedLevel, () => { page.value = 0; load(); });
 
 onMounted(async () => {
+    // La barre supérieure envoie ici avec sa recherche : la reprendre évite de la retaper.
+    const requested = useRoute().query.q;
+    if (typeof requested === 'string' && requested) keyword.value = requested;
+
     try {
         levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
     } catch {
@@ -273,15 +280,19 @@ onMounted(async () => {
                             <th>Niveau</th>
                             <th>Naissance</th>
                             <th>Lieu</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="4" class="py-8 text-center" style="color: var(--text-faint)">
+                            <td colspan="5" class="py-8 text-center" style="color: var(--text-faint)">
                                 Chargement…
                             </td>
                         </tr>
-                        <tr v-for="student in students" v-else :key="student.id">
+                        <tr
+                            v-for="student in students" v-else :key="student.id"
+                            class="cursor-pointer" @click="opened = student"
+                        >
                             <td>
                                 <div class="flex items-center gap-2.5">
                                     <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="28" />
@@ -297,6 +308,12 @@ onMounted(async () => {
                             </td>
                             <td class="text-[12.5px]" style="color: var(--text-muted)">
                                 {{ student.placeOfBirth || '—' }}
+                            </td>
+                            <td class="text-right">
+                                <svg
+                                    class="w-4 h-4 inline" viewBox="0 0 24 24" fill="none"
+                                    stroke="var(--text-faint)" stroke-width="2" stroke-linecap="round"
+                                ><path d="M9 6l6 6-6 6" /></svg>
                             </td>
                         </tr>
                     </tbody>
@@ -333,5 +350,7 @@ onMounted(async () => {
                 </span>
             </template>
         </UiCard>
+
+        <StudentDrawer v-if="opened" :student="opened" @close="opened = null" />
     </div>
 </template>

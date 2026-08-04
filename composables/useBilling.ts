@@ -92,7 +92,7 @@ export function useBilling() {
 
     function receipts(params: {
         page?: number; size?: number; issuedFrom?: string; issuedTo?: string;
-        channel?: string; keyword?: string;
+        channel?: string; keyword?: string; studentId?: string;
     } = {}) {
         const query: Record<string, any> = { page: params.page ?? 0, size: params.size ?? 50 };
         // Bornes, mode et recherche sont posés côté serveur : filtrer la page déjà chargée
@@ -101,6 +101,7 @@ export function useBilling() {
         if (params.issuedTo) query.issuedTo = params.issuedTo;
         if (params.channel) query.channel = params.channel;
         if (params.keyword?.trim()) query.keyword = params.keyword.trim();
+        if (params.studentId) query.studentId = params.studentId;
         return api<PageOf<Receipt>>('/receipts', { query });
     }
 

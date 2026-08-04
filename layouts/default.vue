@@ -54,17 +54,24 @@ async function logout() {
                 style="background: rgba(255,255,255,.09)"
             >{{ auth.user?.establishmentName ?? 'Établissement' }}</span>
 
+            <GlobalSearch />
+
             <div class="flex-1" />
 
             <div class="flex items-center gap-2.5 pl-1">
-                <span
-                    class="w-8 h-8 rounded-full grid place-items-center text-[11px] font-bold shrink-0"
-                    style="background: rgba(255,255,255,.16)"
-                >{{ initials }}</span>
-                <div class="hidden sm:block leading-tight">
-                    <b class="block text-[12.5px] font-bold">{{ auth.fullName }}</b>
-                    <span class="block text-[11px]" style="color: var(--brand-300)">Établissement</span>
-                </div>
+                <NuxtLink
+                    to="/app/profil" class="flex items-center gap-2.5"
+                    title="Mon profil"
+                >
+                    <span
+                        class="w-8 h-8 rounded-full grid place-items-center text-[11px] font-bold shrink-0"
+                        style="background: rgba(255,255,255,.16)"
+                    >{{ initials }}</span>
+                    <div class="hidden sm:block leading-tight">
+                        <b class="block text-[12.5px] font-bold">{{ auth.fullName }}</b>
+                        <span class="block text-[11px]" style="color: var(--brand-300)">Mon profil</span>
+                    </div>
+                </NuxtLink>
                 <button
                     class="w-[34px] h-[34px] rounded-lg grid place-items-center shrink-0"
                     title="Se déconnecter" @click="logout"

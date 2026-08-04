@@ -87,6 +87,60 @@ const deltaCollected = computed(() => {
     return (((summary.value?.collectedThisMonth ?? 0) - previous) / previous) * 100;
 });
 
+/**
+ * École qui n'a pas encore démarré.
+ *
+ * Sans élève ni encaissement, le tableau de bord n'affiche que des zéros : il ne dit pas si la
+ * plateforme est en panne ou s'il reste des étapes à franchir. Le prototype répond par une liste
+ * de mise en route, et c'est la bonne réponse.
+ */
+const onboarding = computed(() => {
+    const students = summary.value?.studentCount ?? 0;
+    const receipts = summary.value?.receiptsThisMonth ?? 0;
+    return students === 0 && receipts === 0;
+});
+
+/**
+ * Étapes de mise en route.
+ *
+ * Chacune est déduite de l'état réel, jamais d'un drapeau qu'il faudrait penser à cocher : une
+ * case « faite » alors que l'école n'a aucun niveau serait pire que pas de liste du tout.
+ */
+const steps = computed(() => [
+    {
+        label: 'Établissement créé',
+        hint: auth.user?.establishmentName ?? 'Votre établissement',
+        done: true,
+        to: '/app/profil',
+    },
+    {
+        label: 'Déclarer les niveaux enseignés',
+        hint: 'Un élève ne peut être inscrit que dans un niveau déclaré',
+        done: (summary.value?.studentCount ?? 0) > 0,
+        to: '/app/niveaux',
+    },
+    {
+        label: 'Inscrire les élèves',
+        hint: 'Saisie une par une, ou import d\'un fichier CSV',
+        done: (summary.value?.studentCount ?? 0) > 0,
+        to: '/app/eleves',
+    },
+    {
+        label: 'Définir les frais et leurs échéances',
+        hint: 'Scolarité, cantine, transport — puis le découpage en tranches',
+        done: (summary.value?.expectedThisMonth ?? 0) > 0,
+        to: '/app/frais',
+    },
+    {
+        label: 'Encaisser un premier règlement',
+        hint: 'Au guichet, ou en ligne depuis l\'application des parents',
+        done: (summary.value?.receiptsThisMonth ?? 0) > 0,
+        to: '/app/encaissement',
+    },
+]);
+
+const stepsDone = computed(() => steps.value.filter((step) => step.done).length);
+
 const collected = computed(() => compact(summary.value?.collectedThisMonth));
 const outstanding = computed(() => compact(summary.value?.overdueAmount));
 const today = computed(() => compact(summary.value?.collectedToday));
@@ -126,6 +180,75 @@ const today = computed(() => compact(summary.value?.collectedToday));
                 <div class="h-7 w-28 rounded animate-pulse mt-3" style="background: var(--surface-sunken)" />
             </div>
         </div>
+
+        <template v-else-if="onboarding">
+            <div
+                class="flex items-center gap-3.5 rounded-xl px-4 py-3.5 mb-3.5"
+                style="background: var(--brand-50); border: 1px solid var(--brand-100)"
+            >
+                <div
+                    class="w-9 h-9 rounded-xl grid place-items-center shrink-0"
+                    style="background: var(--surface-raised); color: var(--brand-600)"
+                >
+                    <svg
+                        class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                    ><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <b class="text-sm" style="color: var(--brand-700)">Bienvenue sur Nelima</b>
+                    <p class="text-[12.5px] mt-0.5" style="color: var(--text-muted)">
+                        Il reste {{ steps.length - stepsDone }} étape{{ steps.length - stepsDone > 1 ? 's' : '' }}
+                        pour que les familles puissent régler en ligne.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid-12">
+                <UiCard
+                    style="grid-column: span 8" :pad="false"
+                    title="Mise en route"
+                    :sub="`${stepsDone} étape${stepsDone > 1 ? 's' : ''} sur ${steps.length} terminée${stepsDone > 1 ? 's' : ''}`"
+                >
+                    <div class="lst">
+                        <div v-for="step in steps" :key="step.label" class="flex items-center gap-3">
+                            <div
+                                class="w-[30px] h-[30px] rounded-lg grid place-items-center shrink-0"
+                                :style="step.done
+                                    ? 'background: var(--success-soft); color: var(--success)'
+                                    : 'background: var(--brand-50); color: var(--brand-600)'"
+                            >
+                                <svg
+                                    class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                >
+                                    <path v-if="step.done" d="M20 6L9 17l-5-5" />
+                                    <path v-else d="M12 5v14M5 12h14" />
+                                </svg>
+                            </div>
+                            <div class="nm flex-1 min-w-0">
+                                <b :style="step.done ? 'color: var(--text-muted)' : ''">{{ step.label }}</b>
+                                <span>{{ step.hint }}</span>
+                            </div>
+                            <UiPill v-if="step.done" tone="ok">Fait</UiPill>
+                            <NuxtLink v-else :to="step.to" class="btn-primary btn-sm">Commencer</NuxtLink>
+                        </div>
+                    </div>
+                </UiCard>
+
+                <UiCard style="grid-column: span 4" title="Besoin d'un coup de main ?">
+                    <p class="text-[13px] leading-relaxed" style="color: var(--text-muted)">
+                        L'import d'une liste d'élèves se fait à partir d'un fichier CSV séparé par
+                        des points-virgules. L'écran Élèves en donne l'en-tête exact et refuse le
+                        fichier entier plutôt que d'importer des lignes fausses.
+                    </p>
+                    <div class="flex gap-2 mt-3.5">
+                        <NuxtLink to="/app/eleves" class="btn-primary btn-sm">Importer des élèves</NuxtLink>
+                        <NuxtLink to="/app/niveaux" class="btn-secondary btn-sm">Déclarer les niveaux</NuxtLink>
+                    </div>
+                </UiCard>
+            </div>
+        </template>
 
         <template v-else>
             <div class="grid-12 mb-3.5">

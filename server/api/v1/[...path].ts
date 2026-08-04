@@ -98,7 +98,10 @@ export default defineEventHandler(async (event) => {
     }
 
     const contentType = response.headers.get('content-type') ?? '';
-    const isTextual = /^(application\/(json|.*\+json|xml)|text\/)/i.test(contentType);
+    // Le CSV est exclu du décodage texte : il commence par une marque d'ordre d'octets, sans
+    // laquelle Excel lit l'UTF-8 comme du latin-1, et `TextDecoder` la retire silencieusement.
+    const isTextual = /^(application\/(json|.*\+json|xml)|text\/)/i.test(contentType)
+        && !/^text\/csv/i.test(contentType);
 
     return isTextual
         ? new TextDecoder('utf-8').decode(response._data)

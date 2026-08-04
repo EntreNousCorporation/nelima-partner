@@ -15,6 +15,23 @@ const channel = ref('');
 const loading = ref(true);
 const error = ref('');
 
+/** Reçu dont le détail est ouvert en tiroir. */
+const opened = ref<Receipt | null>(null);
+
+/**
+ * Lien d'export : mêmes filtres que la liste affichée.
+ *
+ * Exporter tout autre chose que ce qui est à l'écran surprendrait — on télécharge ce qu'on voit,
+ * pagination mise à part, puisqu'un journal comptable se lit d'un bloc.
+ */
+const exportUrl = computed(() => {
+    const params = new URLSearchParams();
+    if (keyword.value.trim()) params.set('keyword', keyword.value.trim());
+    if (channel.value) params.set('channel', channel.value);
+    const query = params.toString();
+    return `/api/v1/receipts/export${query ? `?${query}` : ''}`;
+});
+
 /** Total de la page affichée, et non de tout l'historique : c'est ce que le pied de carte annonce. */
 const pageTotal = computed(() => rows.value.reduce((sum, r) => sum + Number(r.amount ?? 0), 0));
 
@@ -57,7 +74,11 @@ function changePage(delta: number) {
     load();
 }
 
-onMounted(load);
+onMounted(() => {
+    const requested = useRoute().query.q;
+    if (typeof requested === 'string' && requested) keyword.value = requested;
+    load();
+});
 </script>
 
 <template>
@@ -65,7 +86,17 @@ onMounted(load);
         <PageHead
             title="Reçus"
             :sub="`${totalElements} pièce${totalElements > 1 ? 's' : ''} émise${totalElements > 1 ? 's' : ''} · numérotation continue et propre à votre établissement`"
-        />
+        >
+            <template #actions>
+                <a :href="exportUrl" download="encaissements.csv" class="btn-secondary">
+                    <svg
+                        class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round"
+                    ><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" /></svg>
+                    Export comptable
+                </a>
+            </template>
+        </PageHead>
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
@@ -114,7 +145,10 @@ onMounted(load);
                                 Chargement…
                             </td>
                         </tr>
-                        <tr v-for="row in rows" v-else :key="row.id">
+                        <tr
+                            v-for="row in rows" v-else :key="row.id" class="cursor-pointer"
+                            @click="opened = row"
+                        >
                             <td>
                                 <div class="nm">
                                     <b class="nu">{{ row.number }}</b>
@@ -145,7 +179,7 @@ onMounted(load);
                                 <a
                                     :href="`/api/v1/receipts/${row.id}/pdf`"
                                     :download="`recu-${row.number}.pdf`"
-                                    class="btn-secondary btn-sm"
+                                    class="btn-secondary btn-sm" @click.stop
                                 >
                                     <svg
                                         class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
@@ -192,5 +226,7 @@ onMounted(load);
                 </span>
             </template>
         </UiCard>
+
+        <ReceiptDrawer v-if="opened" :receipt="opened" @close="opened = null" />
     </div>
 </template>
