@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-    ATTENDANCE_STATUSES, CONTRACT_TYPES, STAFF_ROLES, attendanceLabel, contractLabel, fullName,
-    seniorityYears, staffRoleLabel,
+    ATTENDANCE_STATUSES, CONTRACT_TYPES, PORTAL_ROLES, STAFF_ROLES, attendanceLabel, contractLabel,
+    fullName, portalRoleLabel, seniorityYears, staffRoleLabel,
     type AttendanceLine, type AttendanceStatus, type AttendanceSummary, type ContractType,
-    type PayrollSummary, type StaffMember, type StaffRole,
+    type PayrollSummary, type PortalRole, type StaffMember, type StaffRole,
 } from '~/composables/useStaff';
 import type { SchoolClass } from '~/composables/useClasses';
 
@@ -16,6 +16,7 @@ import type { SchoolClass } from '~/composables/useClasses';
 const {
     list, create, update, remove,
     attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
+    grantAccess, revokeAccess,
 } = useStaff();
 const { list: listClasses } = useClasses();
 const { can } = usePermissions();
@@ -25,7 +26,7 @@ const classes = ref<SchoolClass[]>([]);
 const loading = ref(true);
 const error = ref('');
 
-const tab = ref<'directory' | 'assignments' | 'attendance' | 'contracts'>('directory');
+const tab = ref<'directory' | 'assignments' | 'attendance' | 'contracts' | 'access'>('directory');
 const keyword = ref('');
 const selectedRole = ref<StaffRole | ''>('');
 const includeInactive = ref(false);
@@ -117,6 +118,47 @@ async function loadPayroll() {
         error.value = "La masse salariale n'a pas pu être chargée.";
     } finally {
         payrollLoading.value = false;
+    }
+}
+
+/* ---- Accès au portail ---- */
+const canGrantAccess = computed(() => can('user_access:write'));
+const granting = ref<StaffMember | null>(null);
+const grantForm = reactive({ username: '', role: 'SECRETARIAT' as PortalRole });
+const grantError = ref('');
+const grantWorking = ref(false);
+
+function openGrant(member: StaffMember) {
+    granting.value = member;
+    // L'adresse de la fiche est proposée, pas imposée : elle sert à joindre la personne, celle du
+    // compte à l'identifier, et ce n'est pas toujours la même.
+    grantForm.username = member.email ?? '';
+    grantForm.role = 'SECRETARIAT';
+    grantError.value = '';
+}
+
+async function confirmGrant() {
+    if (!granting.value) return;
+    grantError.value = '';
+    grantWorking.value = true;
+    try {
+        await grantAccess(granting.value.id, { ...grantForm });
+        granting.value = null;
+        await load();
+    } catch (e: any) {
+        grantError.value = e?.data?.debugMessage ?? "L'accès n'a pas pu être ouvert.";
+    } finally {
+        grantWorking.value = false;
+    }
+}
+
+async function revoke(member: StaffMember) {
+    error.value = '';
+    try {
+        await revokeAccess(member.id);
+        await load();
+    } catch (e: any) {
+        error.value = e?.data?.debugMessage ?? "L'accès n'a pas pu être fermé.";
     }
 }
 
@@ -426,6 +468,10 @@ onMounted(async () => {
                         v-if="canReadSalary" class="chip" :aria-pressed="tab === 'contracts'"
                         @click="tab = 'contracts'"
                     >Contrats</button>
+                    <button
+                        v-if="canGrantAccess" class="chip" :aria-pressed="tab === 'access'"
+                        @click="tab = 'access'"
+                    >Accès au portail</button>
                 </div>
             </div>
 
@@ -680,7 +726,7 @@ onMounted(async () => {
                 />
             </template>
 
-            <template v-else>
+            <template v-else-if="tab === 'contracts'">
                 <p v-if="payrollLoading" class="py-8 text-center text-[12.5px]" style="color: var(--text-faint)">
                     Chargement…
                 </p>
@@ -793,6 +839,72 @@ onMounted(async () => {
                 </template>
             </template>
 
+            <template v-else>
+                <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Membre</th>
+                                <th>Identifiant</th>
+                                <th>Rôle</th>
+                                <th>État</th>
+                                <th class="text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in rows" :key="row.id">
+                                <td>
+                                    <div class="flex items-center gap-2.5">
+                                        <AvatarBadge :name="fullName(row)" :size="34" />
+                                        <b class="text-sm font-extrabold" style="color: var(--navy)">
+                                            {{ fullName(row) }}
+                                        </b>
+                                    </div>
+                                </td>
+                                <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                    {{ row.username ?? '—' }}
+                                </td>
+                                <td>
+                                    <span v-if="row.roleCode" class="tag">
+                                        {{ portalRoleLabel(row.roleCode) }}
+                                    </span>
+                                    <span v-else style="color: var(--text-faint)">—</span>
+                                </td>
+                                <td class="text-[12.5px] font-semibold" :style="row.userId
+                                    ? (row.accessEnabled ? 'color: var(--text)' : 'color: var(--danger)')
+                                    : 'color: var(--text-faint)'">
+                                    {{ row.userId
+                                        ? (row.accessEnabled ? 'Actif' : 'Fermé')
+                                        : 'Aucun accès' }}
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <button
+                                        v-if="!row.userId" class="btn-ghost btn-sm"
+                                        @click="openGrant(row)"
+                                    >Ouvrir un accès</button>
+                                    <button
+                                        v-else-if="row.accessEnabled" class="btn-ghost btn-sm"
+                                        @click="revoke(row)"
+                                    >Fermer l'accès</button>
+                                    <!-- Rouvrir un accès fermé passe par la réactivation du compte,
+                                         qui n'existe pas encore : mieux vaut ne rien proposer que
+                                         proposer un bouton sans effet. -->
+                                    <span v-else class="text-[12px]" style="color: var(--text-faint)">
+                                        compte désactivé
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <EmptyState
+                    v-if="!rows.length"
+                    title="Aucun membre"
+                    text="Les accès s'ouvrent depuis une fiche du personnel : commencez par créer les fiches."
+                />
+            </template>
+
             <template #footer>
                 <span class="text-[12px]" style="color: var(--text-faint)">
                     <b class="nu" style="color: var(--navy)">
@@ -802,10 +914,51 @@ onMounted(async () => {
                     </b>
                     {{ tab === 'directory' ? 'membre(s) affiché(s)'
                         : tab === 'assignments' ? 'classe(s)'
-                            : tab === 'attendance' ? 'ligne(s) de pointage' : 'contrat(s)' }}
+                            : tab === 'attendance' ? 'ligne(s) de pointage'
+                                : tab === 'contracts' ? 'contrat(s)' : 'compte(s) possible(s)' }}
                 </span>
             </template>
         </UiCard>
+
+        <SideDrawer
+            v-if="granting"
+            :title="`Ouvrir un accès pour ${fullName(granting)}`"
+            sub="Un courriel de bienvenue portant le lien de définition du mot de passe part aussitôt"
+            @close="granting = null"
+        >
+            <label class="field-label" for="grant-username">Identifiant de connexion</label>
+            <input
+                id="grant-username" v-model="grantForm.username" type="email" class="input mb-4"
+                placeholder="prenom.nom@ecole.ci"
+            />
+
+            <p class="sec">Rôle</p>
+            <div class="rounded-xl overflow-hidden mb-4" style="border: 1px solid var(--border)">
+                <label
+                    v-for="role in PORTAL_ROLES" :key="role.value"
+                    class="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer"
+                    style="border-bottom: 1px solid var(--border)"
+                >
+                    <input v-model="grantForm.role" type="radio" :value="role.value" />
+                    <span class="flex-1">
+                        <b class="text-[13px]" style="color: var(--navy)">{{ role.label }}</b>
+                        <span class="block text-[11.5px]" style="color: var(--text-faint)">
+                            {{ role.hint }}
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <p v-if="grantError" class="alert-danger" role="alert">{{ grantError }}</p>
+
+            <template #footer>
+                <button
+                    class="btn-primary" :disabled="grantWorking || !grantForm.username"
+                    @click="confirmGrant"
+                >{{ grantWorking ? 'Ouverture…' : 'Ouvrir l’accès' }}</button>
+                <button class="btn-secondary" @click="granting = null">Annuler</button>
+            </template>
+        </SideDrawer>
 
         <StaffDrawer
             v-if="opened" :member="opened" :classes="classes"

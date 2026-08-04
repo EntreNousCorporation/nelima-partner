@@ -53,6 +53,25 @@ export const STAFF_ROLES: { value: StaffRole; label: string; plural: string }[] 
     { value: 'SUPPORT', label: 'Personnel de service', plural: 'Personnel de service' },
 ];
 
+/**
+ * Rôles qu'une école peut attribuer.
+ *
+ * Ni le rôle d'amorçage, qui cumule toutes les permissions, ni celui de l'équipe YPYit : le serveur
+ * les refuse, et les proposer serait une promesse que l'écran ne tient pas.
+ */
+export type PortalRole = 'DIRECTEUR' | 'COMPTABLE' | 'SECRETARIAT';
+
+export const PORTAL_ROLES: { value: PortalRole; label: string; hint: string }[] = [
+    { value: 'DIRECTEUR', label: 'Directeur', hint: 'tout le portail, salaires et accès compris' },
+    { value: 'COMPTABLE', label: 'Comptable', hint: 'encaissements et rémunérations' },
+    { value: 'SECRETARIAT', label: 'Secrétariat', hint: 'élèves, classes et pointage' },
+];
+
+export function portalRoleLabel(role?: string | null) {
+    return PORTAL_ROLES.find((r) => r.value === role)?.label
+        ?? (role === 'ESTABLISHMENT_ROOT' ? 'Administrateur d’établissement' : '—');
+}
+
 export const CONTRACT_TYPES: { value: ContractType; label: string }[] = [
     { value: 'CDI', label: 'CDI' },
     { value: 'CDD', label: 'CDD' },
@@ -184,8 +203,19 @@ export function useStaff() {
         return api<PayrollSummary>('/staff/payroll-summary');
     }
 
+    /** Ouvre un accès au portail : crée le compte et envoie le courriel de bienvenue. */
+    function grantAccess(id: string, body: { username: string; role: PortalRole }) {
+        return api<StaffMember>(`/staff/${id}/access`, { method: 'POST', body });
+    }
+
+    /** Ferme l'accès. Le compte est désactivé, pas supprimé. */
+    function revokeAccess(id: string) {
+        return api<StaffMember>(`/staff/${id}/access`, { method: 'DELETE' });
+    }
+
     return {
         list, findById, create, update, remove, assignClasses, unassignClass,
         attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
+        grantAccess, revokeAccess,
     };
 }
