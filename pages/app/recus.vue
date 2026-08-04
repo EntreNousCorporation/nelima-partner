@@ -59,8 +59,26 @@ onMounted(async () => {
                         <td>{{ row.payerLabel || '—' }}</td>
                         <td>{{ formatAmount(row.amount) }}</td>
                         <td>
-                            <a :href="`/api/v1/receipts/${row.id}/pdf`" target="_blank"
-                               class="underline text-sm">PDF</a>
+                            <!--
+                                `download` et non `target="_blank"` : le serveur renvoie déjà
+                                `Content-Disposition: attachment`, si bien qu'un nouvel onglet
+                                s'ouvrait pour se refermer aussitôt. L'attribut porte le nom du
+                                fichier en secours ; l'en-tête reste la référence.
+                            -->
+                            <a
+                                :href="`/api/v1/receipts/${row.id}/pdf`"
+                                :download="`recu-${row.number}.pdf`"
+                                class="btn-secondary btn-sm"
+                            >
+                                <svg
+                                    class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                >
+                                    <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
+                                </svg>
+                                PDF
+                            </a>
                         </td>
                     </tr>
                 </tbody>
