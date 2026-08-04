@@ -11,6 +11,15 @@ export type SchoolUser = {
     username: string;
     establishmentId?: string;
     establishmentName?: string;
+    roleCode?: string;
+    /**
+     * Permissions du rôle, telles que le backend les déclare.
+     *
+     * Sert à ne pas proposer une action qui sera refusée. Ce n'est pas une protection : le refus
+     * réel se joue côté serveur, et les champs qu'on n'a pas le droit de lire sont absents des
+     * réponses, pas seulement masqués à l'écran.
+     */
+    permissions?: string[];
 };
 
 export type SessionData = {

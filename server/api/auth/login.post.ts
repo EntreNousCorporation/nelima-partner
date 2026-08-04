@@ -73,6 +73,8 @@ export default defineEventHandler(async (event) => {
         username: parsed.data.username,
         establishmentId: raw.establishmentId,
         establishmentName: raw.establishmentName,
+        roleCode: raw.roleCode,
+        permissions: raw.permissions ?? [],
     };
 
     const session = await getSchoolSession(event);
