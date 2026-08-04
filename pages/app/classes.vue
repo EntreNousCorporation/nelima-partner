@@ -2,13 +2,22 @@
 import { useAuthStore } from '~/stores/auth';
 import { fillingRate, type SchoolClass } from '~/composables/useClasses';
 import { CYCLES, cycleLabel, levelLabel, type EducationCycle, type LevelOfStudy } from '~/composables/useStudents';
+import { fullName, type StaffMember } from '~/composables/useStaff';
 
 const auth = useAuthStore();
 const { list, create, update, remove } = useClasses();
 const { establishmentLevels } = useStudents();
+const { list: listStaff } = useStaff();
 
 const rows = ref<SchoolClass[]>([]);
 const levelOptions = ref<LevelOfStudy[]>([]);
+/**
+ * Personnel pouvant tenir une classe.
+ *
+ * On ne propose ni l'administration ni le personnel de service : un titulaire est quelqu'un qui
+ * enseigne, et une liste de trente noms dont deux conviennent se parcourt mal.
+ */
+const teachers = ref<StaffMember[]>([]);
 const loading = ref(true);
 const error = ref('');
 
@@ -27,6 +36,8 @@ const form = reactive({
     name: '',
     room: '',
     capacity: '' as string | number,
+    mainTeacherId: '',
+    /** Conservé tel quel pour les classes d'avant le répertoire, tant qu'aucun titulaire n'est désigné. */
     mainTeacherName: '',
     levelOfStudyCode: '',
 });
@@ -86,7 +97,10 @@ const hasOrphans = computed(() => rows.value.some((row) => !row.cycle));
 
 function openCreate() {
     editing.value = null;
-    Object.assign(form, { name: '', room: '', capacity: '', mainTeacherName: '', levelOfStudyCode: '' });
+    Object.assign(form, {
+        name: '', room: '', capacity: '', mainTeacherId: '', mainTeacherName: '',
+        levelOfStudyCode: '',
+    });
     formError.value = '';
     showForm.value = true;
 }
@@ -97,7 +111,10 @@ function openEdit(schoolClass: SchoolClass) {
         name: schoolClass.name,
         room: schoolClass.room ?? '',
         capacity: schoolClass.capacity,
-        mainTeacherName: schoolClass.mainTeacherName ?? '',
+        mainTeacherId: schoolClass.mainTeacherId ?? '',
+        // Le nom hérité n'est repris que s'il n'a pas de titulaire derrière lui : sinon le
+        // serveur sert déjà le nom du membre désigné, et le recopier ici en ferait un doublon.
+        mainTeacherName: schoolClass.mainTeacherId ? '' : (schoolClass.mainTeacherName ?? ''),
         levelOfStudyCode: schoolClass.levelCode ?? '',
     });
     formError.value = '';
@@ -124,7 +141,8 @@ async function submit() {
             name: form.name,
             room: form.room || undefined,
             capacity: Number(form.capacity),
-            mainTeacherName: form.mainTeacherName || undefined,
+            mainTeacherId: form.mainTeacherId || undefined,
+            mainTeacherName: form.mainTeacherId ? undefined : (form.mainTeacherName || undefined),
             levelOfStudyCode: form.levelOfStudyCode || undefined,
         };
         if (editing.value) await update(editing.value.id, body);
@@ -165,6 +183,14 @@ onMounted(async () => {
         levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
     } catch {
         levelOptions.value = [];
+    }
+    try {
+        teachers.value = (await listStaff())
+            .filter((member) => member.role === 'TEACHER' || member.role === 'DIRECTION');
+    } catch {
+        // Un rôle sans droit de lecture sur le personnel garde l'écran des classes utilisable :
+        // le champ libre prend alors le relais.
+        teachers.value = [];
     }
     await load();
 });
@@ -221,10 +247,28 @@ onMounted(async () => {
                     </div>
                     <div class="sm:col-span-2">
                         <label class="field-label" for="teacher">Titulaire</label>
-                        <input
-                            id="teacher" v-model="form.mainTeacherName" type="text"
-                            placeholder="Nom de l'enseignant" class="input"
-                        />
+                        <select
+                            v-if="teachers.length" id="teacher" v-model="form.mainTeacherId"
+                            class="select"
+                        >
+                            <option value="">Aucun titulaire</option>
+                            <option v-for="member in teachers" :key="member.id" :value="member.id">
+                                {{ fullName(member) }}{{ member.jobTitle ? ` — ${member.jobTitle}` : '' }}
+                            </option>
+                        </select>
+                        <!-- Tant que le répertoire est vide, le champ libre reste la seule façon
+                             de nommer un titulaire : le remplacer par une liste sans options
+                             retirerait la fonction au lieu de l'améliorer. -->
+                        <template v-else>
+                            <input
+                                id="teacher" v-model="form.mainTeacherName" type="text"
+                                placeholder="Nom de l'enseignant" class="input"
+                            />
+                            <p class="text-[11.5px] mt-1" style="color: var(--text-faint)">
+                                Renseignez votre personnel pour désigner un titulaire au lieu de le
+                                saisir.
+                            </p>
+                        </template>
                     </div>
                 </div>
 

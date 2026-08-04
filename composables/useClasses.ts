@@ -3,6 +3,9 @@ export type SchoolClass = {
     name: string;
     room?: string;
     capacity: number;
+    /** Membre du personnel désigné titulaire ; nul tant qu'aucun ne l'est. */
+    mainTeacherId?: string;
+    /** Servi depuis la référence quand elle existe, depuis le nom hérité sinon. */
     mainTeacherName?: string;
     levelCode?: string;
     levelLabel?: string;
@@ -16,6 +19,13 @@ export type SchoolClassForm = {
     name: string;
     room?: string;
     capacity: number | string;
+    /** Nul retire le titulaire : une classe entre deux enseignants n'en a pas. */
+    mainTeacherId?: string;
+    /**
+     * Nom hérité, pour les classes créées avant le répertoire du personnel.
+     *
+     * Ignoré par le serveur dès qu'un titulaire est désigné.
+     */
     mainTeacherName?: string;
     levelOfStudyCode?: string;
 };
