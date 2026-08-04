@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { levelLabel, type LevelOfStudy, type Student } from '~/composables/useStudents';
+import { type SchoolClass } from '~/composables/useClasses';
 
 import { useAuthStore } from '~/stores/auth';
 
@@ -13,7 +14,9 @@ const size = 20;
 const totalElements = ref(0);
 const totalPages = ref(0);
 const selectedLevel = ref<string>('');
+const selectedClass = ref<string>('');
 const keyword = ref('');
+const classOptions = ref<SchoolClass[]>([]);
 const loading = ref(false);
 const loadError = ref('');
 
@@ -84,6 +87,9 @@ async function load() {
             size,
             levelOfStudies: selectedLevel.value ? [selectedLevel.value] : undefined,
             keyword: keyword.value || undefined,
+            schoolClassId: selectedClass.value && selectedClass.value !== 'none'
+                ? selectedClass.value : undefined,
+            unassignedOnly: selectedClass.value === 'none',
         });
         students.value = result.content ?? [];
         totalElements.value = result.totalElements ?? 0;
@@ -140,7 +146,7 @@ watch(keyword, () => {
     debounce = setTimeout(() => { page.value = 0; load(); }, 300);
 });
 
-watch(selectedLevel, () => { page.value = 0; load(); });
+watch([selectedLevel, selectedClass], () => { page.value = 0; load(); });
 
 onMounted(async () => {
     // La barre supérieure envoie ici avec sa recherche : la reprendre évite de la retaper.
@@ -151,6 +157,11 @@ onMounted(async () => {
         levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
     } catch {
         levelOptions.value = [];
+    }
+    try {
+        classOptions.value = await useClasses().list();
+    } catch {
+        classOptions.value = [];
     }
     await load();
 });
@@ -270,6 +281,18 @@ onMounted(async () => {
                         </option>
                     </select>
                 </label>
+
+                <label class="inp">
+                    <select v-model="selectedClass" aria-label="Filtrer par classe">
+                        <option value="">Toutes les classes</option>
+                        <!-- « Sans classe » est le filtre utile de la rentrée : ce sont les élèves
+                             qu'il reste à répartir. -->
+                        <option value="none">Sans classe</option>
+                        <option v-for="schoolClass in classOptions" :key="schoolClass.id" :value="schoolClass.id">
+                            {{ schoolClass.name }}
+                        </option>
+                    </select>
+                </label>
             </div>
 
             <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
@@ -278,6 +301,7 @@ onMounted(async () => {
                         <tr>
                             <th>Élève</th>
                             <th>Niveau</th>
+                            <th>Classe</th>
                             <th>Naissance</th>
                             <th>Lieu</th>
                             <th></th>
@@ -285,7 +309,7 @@ onMounted(async () => {
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="5" class="py-8 text-center" style="color: var(--text-faint)">
+                            <td colspan="6" class="py-8 text-center" style="color: var(--text-faint)">
                                 Chargement…
                             </td>
                         </tr>
@@ -303,6 +327,14 @@ onMounted(async () => {
                                 </div>
                             </td>
                             <td><span class="tag">{{ levelLabel(student.levelOfStudy) }}</span></td>
+                            <td>
+                                <span v-if="student.schoolClass" class="tag">
+                                    {{ student.schoolClass.name }}
+                                </span>
+                                <span v-else class="text-[11.5px]" style="color: var(--text-faint)">
+                                    Sans classe
+                                </span>
+                            </td>
                             <td class="nu text-[12.5px]" style="color: var(--text-muted)">
                                 {{ formatDate(student.birthDay) }}
                             </td>

@@ -83,6 +83,13 @@ onMounted(async () => {
         <dl class="kv mb-5">
             <dt>Matricule</dt><dd class="nu">{{ student.registrationNumber }}</dd>
             <dt>Niveau</dt><dd>{{ levelLabel(student.levelOfStudy) }}</dd>
+            <dt>Classe</dt>
+            <dd>
+                {{ student.schoolClass?.name ?? 'Sans classe' }}
+                <span v-if="student.schoolClass?.room" style="color: var(--text-faint)">
+                    · salle {{ student.schoolClass.room }}
+                </span>
+            </dd>
             <dt>Naissance</dt><dd class="nu">{{ formatDate(student.birthDay) }}</dd>
             <dt>Lieu</dt><dd>{{ student.placeOfBirth || '—' }}</dd>
         </dl>

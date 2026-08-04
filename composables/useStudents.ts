@@ -13,6 +13,7 @@ export type Student = {
     birthDay: string;
     placeOfBirth?: string;
     levelOfStudy?: LevelOfStudy;
+    schoolClass?: { id: string; name: string; room?: string };
 };
 
 export type Page<T> = {
@@ -41,6 +42,7 @@ export function useStudents() {
      */
     function search(params: {
         page: number; size: number; levelOfStudies?: string[]; keyword?: string;
+        schoolClassId?: string; unassignedOnly?: boolean;
     }) {
         const query: Record<string, any> = { page: params.page, size: params.size };
         if (params.levelOfStudies?.length) {
@@ -51,6 +53,8 @@ export function useStudents() {
         if (params.keyword?.trim()) {
             query.keyword = params.keyword.trim();
         }
+        if (params.schoolClassId) query.schoolClassId = params.schoolClassId;
+        if (params.unassignedOnly) query.unassignedOnly = true;
         return api<Page<Student>>('/students/search', { query });
     }
 

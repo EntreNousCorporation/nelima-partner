@@ -17,6 +17,7 @@ const tabs = [
     { label: 'Impayés', to: '/app/impayes', icon: 'M12 8v5M12 16.5v.5M3.5 19h17L12 4z' },
     { label: 'Reçus', to: '/app/recus', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6' },
     { label: 'Frais', to: '/app/frais', icon: 'M12 3v18M8 7h6a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h7' },
+    { label: 'Classes', to: '/app/classes', icon: 'M3 7l9-4 9 4-9 4zM7 11v5l5 3 5-3v-5' },
     { label: 'Élèves', to: '/app/eleves', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 20a8 8 0 0 1 16 0' },
     { label: 'Niveaux', to: '/app/niveaux', icon: 'M4 7h16M4 12h16M4 17h10' },
 ];

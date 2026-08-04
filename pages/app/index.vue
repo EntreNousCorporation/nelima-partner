@@ -12,6 +12,10 @@ type OverdueStudent = {
 };
 type MonthlyPoint = { month: string; expected: number; collected: number };
 
+type ClassFilling = {
+    id: string; name: string; levelLabel: string | null; studentCount: number; capacity: number;
+};
+
 type Summary = {
     studentCount: number;
     collectedThisMonth: number;
@@ -21,6 +25,7 @@ type Summary = {
     expectedThisMonth: number;
     collectedPreviousMonth: number;
     monthly: MonthlyPoint[];
+    classFilling: ClassFilling[];
     pendingAmount: number;
     pendingCount: number;
     overdueAmount: number;
@@ -455,21 +460,64 @@ const today = computed(() => compact(summary.value?.collectedToday));
                     </div>
                 </section>
 
-                <section class="card p-4" style="grid-column: span 5">
-                    <h3 class="text-sm font-extrabold mb-3" style="color: var(--navy)">
-                        Effectif
-                    </h3>
-                    <div class="flex items-baseline gap-2">
-                        <span class="kpi-value">{{ summary?.studentCount ?? 0 }}</span>
-                        <span class="text-[13px]" style="color: var(--text-muted)">élèves inscrits</span>
+                <section class="card" style="grid-column: span 5">
+                    <div
+                        class="px-4 py-3 flex items-start justify-between gap-3"
+                        style="border-bottom: 1px solid var(--border)"
+                    >
+                        <div>
+                            <h3 class="text-sm font-extrabold" style="color: var(--navy)">
+                                Remplissage des classes
+                            </h3>
+                            <p class="text-[11.5px] mt-0.5" style="color: var(--text-faint)">
+                                {{ summary?.studentCount ?? 0 }} élèves inscrits
+                            </p>
+                        </div>
+                        <NuxtLink to="/app/classes" class="btn-secondary btn-sm">Les classes</NuxtLink>
                     </div>
-                    <p class="text-[12.5px] mt-3 leading-relaxed" style="color: var(--text-muted)">
-                        Le remplissage par classe et les présences du jour, prévus par la maquette,
-                        arriveront avec la gestion des classes.
-                    </p>
-                    <NuxtLink to="/app/eleves" class="btn-secondary btn-sm mt-3">
-                        Voir les élèves
-                    </NuxtLink>
+
+                    <div v-if="summary?.classFilling?.length" class="p-4 flex flex-col gap-3">
+                        <div v-for="klass in summary.classFilling.slice(0, 6)" :key="klass.id">
+                            <div class="flex items-center justify-between gap-3 mb-1">
+                                <b class="text-[12.5px]" style="color: var(--navy)">
+                                    {{ klass.name }}
+                                    <span class="font-medium" style="color: var(--text-faint)">
+                                        {{ klass.levelLabel ?? '' }}
+                                    </span>
+                                </b>
+                                <!-- Un effectif au-delà de la capacité se lit en rouge : c'est la
+                                     classe où l'école devra ajouter une table, pas une décoration. -->
+                                <span
+                                    class="nu text-[12px] font-bold"
+                                    :style="klass.studentCount > klass.capacity
+                                        ? 'color: var(--danger)' : 'color: var(--text-muted)'"
+                                >{{ klass.studentCount }}/{{ klass.capacity }}</span>
+                            </div>
+                            <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--surface-sunken)">
+                                <i
+                                    class="block h-full rounded-full"
+                                    :style="{
+                                        width: `${Math.min(100, klass.capacity ? klass.studentCount / klass.capacity * 100 : 0)}%`,
+                                        background: klass.studentCount > klass.capacity
+                                            ? 'var(--danger-solid)'
+                                            : (klass.capacity && klass.studentCount / klass.capacity > .92)
+                                                ? 'var(--warning-solid)' : 'var(--brand-600)',
+                                    }"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-else class="empty">
+                        <p class="empty-title">Aucune classe</p>
+                        <p class="empty-text">
+                            Créez vos classes pour répartir les élèves et suivre le remplissage
+                            des salles.
+                        </p>
+                        <NuxtLink to="/app/classes" class="btn-primary btn-sm mt-2">
+                            Créer une classe
+                        </NuxtLink>
+                    </div>
                 </section>
             </div>
         </template>
