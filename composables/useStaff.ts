@@ -94,6 +94,29 @@ export function seniorityYears(member: StaffMember) {
     return years;
 }
 
+export type AttendanceLine = {
+    staffId: string;
+    firstName: string;
+    lastName: string;
+    role: StaffRole;
+    jobTitle?: string;
+    day: string;
+    /** Nul tant que la personne n'a pas été pointée : c'est elle qu'on cherche le matin. */
+    status?: AttendanceStatus;
+    note?: string;
+};
+
+export type AttendanceSummary = {
+    from: string;
+    to: string;
+    present: number;
+    late: number;
+    absent: number;
+    leave: number;
+    /** Nul quand rien n'a été pointé du mois — distinct de zéro, qui dirait « personne n'est venu ». */
+    presenceRate?: number;
+};
+
 export function useStaff() {
     const api = useApi();
 
@@ -126,5 +149,25 @@ export function useStaff() {
         return api<StaffMember>(`/staff/${id}/classes/${classId}`, { method: 'DELETE' });
     }
 
-    return { list, findById, create, update, remove, assignClasses, unassignClass };
+    /** Feuille d'une journée. Sans date, la journée courante. */
+    function attendanceSheet(day?: string) {
+        return api<AttendanceLine[]>('/staff/attendance', { query: day ? { day } : {} });
+    }
+
+    /** Pointe une journée. Repointer la même corrige la ligne au lieu d'en créer une seconde. */
+    function recordAttendance(id: string, body: { day: string; status: AttendanceStatus; note?: string }) {
+        return api<AttendanceLine>(`/staff/${id}/attendance`, { method: 'PUT', body });
+    }
+
+    /** Bilan d'un mois, au format `2026-08`. */
+    function attendanceSummary(month?: string) {
+        return api<AttendanceSummary>('/staff/attendance/summary', {
+            query: month ? { month } : {},
+        });
+    }
+
+    return {
+        list, findById, create, update, remove, assignClasses, unassignClass,
+        attendanceSheet, recordAttendance, attendanceSummary,
+    };
 }

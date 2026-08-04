@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {
-    CONTRACT_TYPES, STAFF_ROLES, attendanceLabel, contractLabel, fullName, staffRoleLabel,
-    type ContractType, type StaffMember, type StaffRole,
+    ATTENDANCE_STATUSES, CONTRACT_TYPES, STAFF_ROLES, attendanceLabel, contractLabel, fullName,
+    staffRoleLabel,
+    type AttendanceLine, type AttendanceStatus, type AttendanceSummary, type ContractType,
+    type StaffMember, type StaffRole,
 } from '~/composables/useStaff';
 import type { SchoolClass } from '~/composables/useClasses';
 
@@ -11,7 +13,7 @@ import type { SchoolClass } from '~/composables/useClasses';
  * Deux onglets ici : l'annuaire, et les affectations vues depuis la classe. Les présences, les
  * contrats et les accès viennent ensuite, et la barre d'onglets est faite pour les accueillir.
  */
-const { list, create, update, remove } = useStaff();
+const { list, create, update, remove, attendanceSheet, recordAttendance, attendanceSummary } = useStaff();
 const { list: listClasses } = useClasses();
 const { can } = usePermissions();
 
@@ -20,7 +22,7 @@ const classes = ref<SchoolClass[]>([]);
 const loading = ref(true);
 const error = ref('');
 
-const tab = ref<'directory' | 'assignments'>('directory');
+const tab = ref<'directory' | 'assignments' | 'attendance'>('directory');
 const keyword = ref('');
 const selectedRole = ref<StaffRole | ''>('');
 const includeInactive = ref(false);
@@ -46,6 +48,62 @@ const form = reactive({
 
 const canWrite = computed(() => can('staff:write'));
 const canReadSalary = computed(() => can('staff:read_salary'));
+const canPoint = computed(() => can('attendance:write'));
+
+/* ---- Présences ---- */
+/** Journée pointée. Aujourd'hui par défaut : c'est la feuille du matin qu'on vient chercher. */
+const day = ref(new Date().toISOString().slice(0, 10));
+const sheet = ref<AttendanceLine[]>([]);
+const summary = ref<AttendanceSummary | null>(null);
+const sheetLoading = ref(false);
+const pointing = ref('');
+
+const today = new Date().toISOString().slice(0, 10);
+
+const sheetCounts = computed(() => ({
+    present: sheet.value.filter((line) => line.status === 'PRESENT').length,
+    late: sheet.value.filter((line) => line.status === 'LATE').length,
+    absent: sheet.value.filter((line) => line.status === 'ABSENT').length,
+    leave: sheet.value.filter((line) => line.status === 'LEAVE').length,
+    pending: sheet.value.filter((line) => !line.status).length,
+}));
+
+async function loadSheet() {
+    sheetLoading.value = true;
+    error.value = '';
+    try {
+        const [lines, bilan] = await Promise.all([
+            attendanceSheet(day.value),
+            attendanceSummary(day.value.slice(0, 7)),
+        ]);
+        sheet.value = lines;
+        summary.value = bilan;
+    } catch {
+        error.value = "La feuille de pointage n'a pas pu être chargée.";
+    } finally {
+        sheetLoading.value = false;
+    }
+}
+
+async function point(line: AttendanceLine, status: AttendanceStatus) {
+    error.value = '';
+    pointing.value = line.staffId;
+    try {
+        await recordAttendance(line.staffId, { day: day.value, status });
+        await loadSheet();
+        // L'annuaire affiche le statut du jour : le laisser périmé donnerait deux réponses
+        // différentes à la même question sur le même écran.
+        if (day.value === today) await load();
+    } catch (e: any) {
+        error.value = e?.data?.debugMessage ?? "Le pointage n'a pas pu être enregistré.";
+    } finally {
+        pointing.value = '';
+    }
+}
+
+watch([tab, day], () => {
+    if (tab.value === 'attendance') loadSheet();
+});
 
 const filtered = computed(() => {
     const q = keyword.value.trim().toLowerCase();
@@ -339,6 +397,10 @@ onMounted(async () => {
                         class="chip" :aria-pressed="tab === 'assignments'"
                         @click="tab = 'assignments'"
                     >Affectations</button>
+                    <button
+                        class="chip" :aria-pressed="tab === 'attendance'"
+                        @click="tab = 'attendance'"
+                    >Présences</button>
                 </div>
             </div>
 
@@ -466,7 +528,7 @@ onMounted(async () => {
                 />
             </template>
 
-            <template v-else>
+            <template v-else-if="tab === 'assignments'">
                 <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
                     <table class="table">
                         <thead>
@@ -508,12 +570,99 @@ onMounted(async () => {
                 />
             </template>
 
+            <template v-else>
+                <div class="tbar">
+                    <label class="inp" style="flex: 0 0 auto">
+                        <span class="text-[12.5px]" style="color: var(--text-faint)">Journée</span>
+                        <input v-model="day" type="date" :max="today" aria-label="Journée pointée" />
+                    </label>
+
+                    <div class="flex items-center gap-2 flex-wrap text-[12.5px]" style="color: var(--text-muted)">
+                        <span><b class="nu" style="color: var(--navy)">{{ sheetCounts.present }}</b> présents</span>
+                        <span><b class="nu" style="color: var(--navy)">{{ sheetCounts.late }}</b> en retard</span>
+                        <span><b class="nu" style="color: var(--danger)">{{ sheetCounts.absent }}</b> absents</span>
+                        <span><b class="nu" style="color: var(--navy)">{{ sheetCounts.leave }}</b> en congé</span>
+                        <span v-if="sheetCounts.pending" style="color: var(--text-faint)">
+                            {{ sheetCounts.pending }} non pointé(s)
+                        </span>
+                    </div>
+
+                    <div class="flex-1" />
+
+                    <span class="text-[12.5px]" style="color: var(--text-faint)">
+                        Taux du mois
+                        <b class="nu" style="color: var(--navy)">
+                            <!-- Pas de taux plutôt qu'un zéro : zéro se lirait « personne n'est
+                                 venu » là où il faut lire « on n'a pas pointé ». -->
+                            {{ summary?.presenceRate != null ? `${summary.presenceRate} %` : '—' }}
+                        </b>
+                    </span>
+                </div>
+
+                <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Membre</th>
+                                <th>Fonction</th>
+                                <th>Statut</th>
+                                <th>Motif</th>
+                                <th class="text-right">Pointer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="sheetLoading">
+                                <td colspan="5" class="py-8 text-center" style="color: var(--text-faint)">
+                                    Chargement…
+                                </td>
+                            </tr>
+                            <tr v-for="line in sheet" v-else :key="line.staffId">
+                                <td>
+                                    <div class="flex items-center gap-2.5">
+                                        <AvatarBadge :name="`${line.lastName} ${line.firstName}`" :size="34" />
+                                        <b class="text-sm font-extrabold" style="color: var(--navy)">
+                                            {{ line.lastName }} {{ line.firstName }}
+                                        </b>
+                                    </div>
+                                </td>
+                                <td><span class="tag">{{ line.jobTitle ?? staffRoleLabel(line.role) }}</span></td>
+                                <td
+                                    class="text-[12.5px] font-semibold"
+                                    :style="line.status === 'ABSENT' ? 'color: var(--danger)'
+                                        : line.status ? 'color: var(--text)' : 'color: var(--text-faint)'"
+                                >{{ attendanceLabel(line.status) }}</td>
+                                <td class="text-[12px]" style="color: var(--text-faint)">
+                                    {{ line.note ?? '—' }}
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <button
+                                        v-for="status in ATTENDANCE_STATUSES" :key="status.value"
+                                        class="btn-ghost btn-sm"
+                                        :disabled="!canPoint || pointing === line.staffId"
+                                        :aria-pressed="line.status === status.value"
+                                        @click="point(line, status.value)"
+                                    >{{ status.label }}</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <EmptyState
+                    v-if="!sheetLoading && !sheet.length"
+                    title="Personne à pointer"
+                    text="La feuille reprend le personnel actif : créez des fiches pour pouvoir pointer."
+                />
+            </template>
+
             <template #footer>
                 <span class="text-[12px]" style="color: var(--text-faint)">
                     <b class="nu" style="color: var(--navy)">
-                        {{ tab === 'directory' ? filtered.length : assignments.length }}
+                        {{ tab === 'directory' ? filtered.length
+                            : tab === 'assignments' ? assignments.length : sheet.length }}
                     </b>
-                    {{ tab === 'directory' ? 'membre(s) affiché(s)' : 'classe(s)' }}
+                    {{ tab === 'directory' ? 'membre(s) affiché(s)'
+                        : tab === 'assignments' ? 'classe(s)' : 'ligne(s) de pointage' }}
                 </span>
             </template>
         </UiCard>
