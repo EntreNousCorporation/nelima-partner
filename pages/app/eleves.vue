@@ -13,6 +13,7 @@ const size = 20;
 const totalElements = ref(0);
 const totalPages = ref(0);
 const selectedLevel = ref<string>('');
+const keyword = ref('');
 const loading = ref(false);
 const loadError = ref('');
 
@@ -48,7 +49,7 @@ async function submitImport() {
     } catch (e: any) {
         // Le rapport du serveur désigne les lignes fautives : on le montre tel quel, c'est la
         // seule information qui permet à l'école de corriger son fichier.
-        importError.value = e?.response?._data?.debugMessage
+        importError.value = e?.data?.debugMessage
             ?? "Le fichier n'a pas pu être importé.";
     } finally {
         importing.value = false;
@@ -79,6 +80,7 @@ async function load() {
             page: page.value,
             size,
             levelOfStudies: selectedLevel.value ? [selectedLevel.value] : undefined,
+            keyword: keyword.value || undefined,
         });
         students.value = result.content ?? [];
         totalElements.value = result.totalElements ?? 0;
@@ -127,6 +129,14 @@ function formatDate(value?: string) {
     return d && m && y ? `${d}/${m}/${y}` : value;
 }
 
+/** La recherche part au serveur : on attend une pause de frappe pour ne pas la relancer par lettre. */
+let debounce: ReturnType<typeof setTimeout> | undefined;
+
+watch(keyword, () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { page.value = 0; load(); }, 300);
+});
+
 watch(selectedLevel, () => { page.value = 0; load(); });
 
 onMounted(async () => {
@@ -141,80 +151,113 @@ onMounted(async () => {
 
 <template>
     <div>
-        <div class="page-header">
-            <div>
-                <h1 class="page-title">Élèves</h1>
-                <p class="page-subtitle">
-                    {{ totalElements }} élève{{ totalElements > 1 ? 's' : '' }} inscrit{{ totalElements > 1 ? 's' : '' }}
-                </p>
-            </div>
-            <div class="flex gap-2">
-                <button class="btn-secondary"
-                        @click="showImport = !showImport; showForm = false">
+        <PageHead
+            title="Élèves"
+            :sub="`${totalElements} élève${totalElements > 1 ? 's' : ''} inscrit${totalElements > 1 ? 's' : ''}`"
+        >
+            <template #actions>
+                <button class="btn-secondary" @click="showImport = !showImport; showForm = false">
                     {{ showImport ? 'Annuler' : 'Importer un fichier' }}
                 </button>
-                <button class="btn-primary"
-                        @click="showForm = !showForm; showImport = false">
+                <button class="btn-primary" @click="showForm = !showForm; showImport = false">
                     {{ showForm ? 'Annuler' : 'Nouvel élève' }}
                 </button>
-            </div>
-        </div>
+            </template>
+        </PageHead>
 
-        <form v-if="showImport" class="card-pad mt-6"
-              @submit.prevent="submitImport">
-            <h2 class="section-title">Importer une liste d'élèves</h2>
-            <p class="text-sm opacity-70 mb-4">
-                Fichier CSV séparé par des points-virgules, avec cet en-tête exact :<br />
-                <code class="text-xs">matricule;nom;prenom;date_naissance;lieu_naissance;niveau</code><br />
-                Les dates s'écrivent AAAA-MM-JJ, et le niveau doit être l'un de ceux que vous avez
-                déclarés. L'import est tout ou rien : si une ligne est invalide, rien n'est enregistré.
-            </p>
-            <input type="file" accept=".csv,text/csv" required
-                   class="block text-sm" @change="onFileChange" />
-            <p v-if="importError" class="alert-danger mt-3" role="alert">{{ importError }}</p>
-            <button type="submit" :disabled="importing || !importFile"
-                    class="btn-primary mt-4">
-                {{ importing ? 'Import en cours…' : 'Importer' }}
-            </button>
-        </form>
-
-        <p v-if="importMessage" class="alert-success mt-4">{{ importMessage }}</p>
-
-        <form
-            v-if="showForm"
-            class="card-pad mt-6"
-            @submit.prevent="submit"
+        <UiCard
+            v-if="showImport" class="mb-3.5"
+            title="Importer une liste d'élèves"
+            sub="Fichier CSV séparé par des points-virgules"
         >
-            <h2 class="section-title">Nouvel élève</h2>
-            <p v-if="!levelOptions.length" class="mb-4 text-sm">
-                Aucun niveau n'est déclaré pour votre établissement. Renseignez-les d'abord dans
-                <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
-            </p>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <label class="field-label">Prénom
-                    <input v-model="form.firstName" type="text" required
-                           class="input mt-1" />
+            <form @submit.prevent="submitImport">
+                <p class="text-[12.5px] mb-3 leading-relaxed" style="color: var(--text-muted)">
+                    En-tête exact attendu :
+                    <code class="text-[11.5px]">matricule;nom;prenom;date_naissance;lieu_naissance;niveau</code><br />
+                    Les dates s'écrivent AAAA-MM-JJ, et le niveau doit être l'un de ceux que vous
+                    avez déclarés. L'import est tout ou rien : si une ligne est invalide, rien n'est
+                    enregistré.
+                </p>
+                <input type="file" accept=".csv,text/csv" required class="block text-sm"
+                       @change="onFileChange" />
+                <p v-if="importError" class="alert-danger mt-3" role="alert">{{ importError }}</p>
+                <button type="submit" :disabled="importing || !importFile" class="btn-primary mt-4">
+                    {{ importing ? 'Import en cours…' : 'Importer' }}
+                </button>
+            </form>
+        </UiCard>
+
+        <p v-if="importMessage" class="alert-success mb-3.5">{{ importMessage }}</p>
+
+        <UiCard v-if="showForm" class="mb-3.5" title="Nouvel élève" sub="Tous les champs sont requis">
+            <form @submit.prevent="submit">
+                <p v-if="!levelOptions.length" class="alert-danger mb-4">
+                    Aucun niveau n'est déclaré pour votre établissement. Renseignez-les d'abord dans
+                    <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
+                </p>
+                <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                        <label class="field-label" for="firstName">Prénom</label>
+                        <input id="firstName" v-model="form.firstName" type="text" required class="input" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="lastName">Nom</label>
+                        <input id="lastName" v-model="form.lastName" type="text" required class="input" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="registrationNumber">Matricule</label>
+                        <input
+                            id="registrationNumber" v-model="form.registrationNumber" type="text"
+                            required class="input"
+                        />
+                    </div>
+                    <div>
+                        <label class="field-label" for="birthDay">Date de naissance</label>
+                        <input id="birthDay" v-model="form.birthDay" type="date" required class="input" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="placeOfBirth">Lieu de naissance</label>
+                        <input id="placeOfBirth" v-model="form.placeOfBirth" type="text" required class="input" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="level">Niveau</label>
+                        <select id="level" v-model="form.levelOfStudyCode" required class="select">
+                            <option value="" disabled>Choisir…</option>
+                            <option v-for="level in levelOptions" :key="level.id" :value="level.code">
+                                {{ levelLabel(level) }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
+
+                <button type="submit" :disabled="saving || !formComplete" class="btn-primary mt-4">
+                    {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+                </button>
+            </form>
+        </UiCard>
+
+        <p v-if="loadError" class="alert-danger mb-3.5" role="alert">{{ loadError }}</p>
+
+        <UiCard :pad="false">
+            <div class="tbar">
+                <label class="inp" style="flex: 0 1 260px">
+                    <svg
+                        class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round"
+                    >
+                        <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <input
+                        v-model="keyword" type="search" class="w-full"
+                        placeholder="Nom, prénom ou matricule…" aria-label="Rechercher un élève"
+                    />
                 </label>
-                <label class="field-label">Nom
-                    <input v-model="form.lastName" type="text" required
-                           class="input mt-1" />
-                </label>
-                <label class="field-label">Matricule
-                    <input v-model="form.registrationNumber" type="text" required
-                           class="input mt-1" />
-                </label>
-                <label class="field-label">Date de naissance
-                    <input v-model="form.birthDay" type="date" required
-                           class="input mt-1" />
-                </label>
-                <label class="field-label">Lieu de naissance
-                    <input v-model="form.placeOfBirth" type="text" required
-                           class="input mt-1" />
-                </label>
-                <label class="field-label">Niveau
-                    <select v-model="form.levelOfStudyCode" required
-                            class="select mt-1">
-                        <option value="" disabled>Choisir…</option>
+
+                <label class="inp">
+                    <select v-model="selectedLevel" aria-label="Filtrer par niveau">
+                        <option value="">Tous les niveaux</option>
                         <option v-for="level in levelOptions" :key="level.id" :value="level.code">
                             {{ levelLabel(level) }}
                         </option>
@@ -222,68 +265,73 @@ onMounted(async () => {
                 </label>
             </div>
 
-            <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
-
-            <div class="mt-4">
-                <button type="submit" :disabled="saving || !formComplete"
-                        class="btn-primary">
-                    {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-                </button>
+            <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Élève</th>
+                            <th>Niveau</th>
+                            <th>Naissance</th>
+                            <th>Lieu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-if="loading">
+                            <td colspan="4" class="py-8 text-center" style="color: var(--text-faint)">
+                                Chargement…
+                            </td>
+                        </tr>
+                        <tr v-for="student in students" v-else :key="student.id">
+                            <td>
+                                <div class="flex items-center gap-2.5">
+                                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="28" />
+                                    <div class="nm min-w-0">
+                                        <b>{{ student.lastName }} {{ student.firstName }}</b>
+                                        <span class="nu">{{ student.registrationNumber }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="tag">{{ levelLabel(student.levelOfStudy) }}</span></td>
+                            <td class="nu text-[12.5px]" style="color: var(--text-muted)">
+                                {{ formatDate(student.birthDay) }}
+                            </td>
+                            <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                {{ student.placeOfBirth || '—' }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-        </form>
 
-        <div class="mt-6 flex items-center gap-3">
-            <label class="field-label">Niveau
-                <select v-model="selectedLevel"
-                        class="select w-auto">
-                    <option value="">Tous</option>
-                    <option v-for="level in levelOptions" :key="level.id" :value="level.code">
-                        {{ levelLabel(level) }}
-                    </option>
-                </select>
-            </label>
-        </div>
+            <EmptyState
+                v-if="!loading && !students.length && (keyword || selectedLevel)"
+                title="Aucun résultat"
+                text="Aucun élève ne correspond à cette recherche."
+            />
+            <EmptyState
+                v-else-if="!loading && !students.length"
+                title="Aucun élève inscrit"
+                text="Ajoutez vos élèves un par un, ou importez la liste complète depuis un fichier CSV."
+            />
 
-        <p v-if="loadError" class="alert-danger mt-4" role="alert">{{ loadError }}</p>
-
-        <div class="table-wrap mt-4">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Matricule</th>
-                        <th>Nom</th>
-                        <th>Prénom</th>
-                        <th>Niveau</th>
-                        <th>Naissance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-if="loading">
-                        <td colspan="5" class="py-8 text-center" style="color: var(--text-muted)">Chargement…</td>
-                    </tr>
-                    <tr v-else-if="!students.length">
-                        <td colspan="5" class="py-8 text-center" style="color: var(--text-muted)">
-                            Aucun élève pour l'instant. Utilisez « Nouvel élève » pour en ajouter un.
-                        </td>
-                    </tr>
-                    <tr v-for="student in students" :key="student.id"
-                        >
-                        <td class="font-mono">{{ student.registrationNumber }}</td>
-                        <td>{{ student.lastName }}</td>
-                        <td>{{ student.firstName }}</td>
-                        <td>{{ levelLabel(student.levelOfStudy) }}</td>
-                        <td>{{ formatDate(student.birthDay) }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div v-if="totalPages > 1" class="mt-4 flex items-center gap-3 text-sm">
-            <button class="btn-secondary btn-sm"
-                    :disabled="page === 0" @click="changePage(-1)">Précédent</button>
-            <span class="opacity-70">Page {{ page + 1 }} sur {{ totalPages }}</span>
-            <button class="btn-secondary btn-sm"
-                    :disabled="page >= totalPages - 1" @click="changePage(1)">Suivant</button>
-        </div>
+            <template #footer>
+                <span class="text-[12px]" style="color: var(--text-faint)">
+                    <b class="nu" style="color: var(--navy)">{{ students.length }}</b> affichés sur
+                    <b class="nu" style="color: var(--navy)">{{ totalElements }}</b>
+                </span>
+                <span v-if="totalPages > 1" class="flex items-center gap-2">
+                    <button class="btn-secondary btn-sm" :disabled="page === 0" @click="changePage(-1)">
+                        Précédent
+                    </button>
+                    <span class="text-[12px]" style="color: var(--text-faint)">
+                        {{ page + 1 }} / {{ totalPages }}
+                    </span>
+                    <button
+                        class="btn-secondary btn-sm" :disabled="page >= totalPages - 1"
+                        @click="changePage(1)"
+                    >Suivant</button>
+                </span>
+            </template>
+        </UiCard>
     </div>
 </template>

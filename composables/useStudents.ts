@@ -39,10 +39,17 @@ export function useStudents() {
      * L'établissement n'est jamais passé en paramètre : le serveur l'impose à partir du compte
      * connecté. L'envoyer depuis le client ne servirait qu'à laisser croire qu'il est modifiable.
      */
-    function search(params: { page: number; size: number; levelOfStudies?: string[] }) {
+    function search(params: {
+        page: number; size: number; levelOfStudies?: string[]; keyword?: string;
+    }) {
         const query: Record<string, any> = { page: params.page, size: params.size };
         if (params.levelOfStudies?.length) {
             query.levelOfStudies = params.levelOfStudies;
+        }
+        // La recherche est faite par le serveur et non sur la page affichée : filtrer localement
+        // aurait ignoré les élèves des pages suivantes, en donnant l'air d'avoir cherché partout.
+        if (params.keyword?.trim()) {
+            query.keyword = params.keyword.trim();
         }
         return api<Page<Student>>('/students/search', { query });
     }

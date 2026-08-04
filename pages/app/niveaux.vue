@@ -74,40 +74,43 @@ onMounted(load);
 
 <template>
     <div>
-        <h1 class="page-title">Niveaux enseignés</h1>
-        <p class="mt-1 opacity-70 max-w-2xl">
-            Sélectionnez les niveaux proposés par votre établissement. Un élève ne peut être inscrit
-            que dans un niveau déclaré ici, et les frais se ciblent par niveau.
-        </p>
+        <PageHead
+            title="Niveaux enseignés"
+            sub="Un élève ne peut être inscrit que dans un niveau déclaré ici, et les frais se ciblent par niveau"
+        />
 
-        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
-        <p v-if="message" class="alert-success mt-4">{{ message }}</p>
+        <p v-if="error" class="alert-danger mb-3.5" role="alert">{{ error }}</p>
+        <p v-if="message" class="alert-success mb-3.5">{{ message }}</p>
 
-        <p v-if="loading" class="mt-6 opacity-70">Chargement…</p>
+        <UiCard
+            class="max-w-4xl"
+            title="Catalogue du système éducatif ivoirien"
+            sub="Sélectionnez les niveaux que votre établissement propose"
+        >
+            <p v-if="loading" class="text-[13px]" style="color: var(--text-faint)">Chargement…</p>
 
-        <div v-else class="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
-            <label
-                v-for="level in catalogue" :key="level.id"
-                class="flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer" style="border: 1px solid var(--border)"
-                :class="selected.includes(level.code) ? 'bg-nelima-50 dark:bg-white/10 border-nelima-300' : ''"
-            >
-                <input
-                    type="checkbox" :checked="selected.includes(level.code)"
-                    @change="toggle(level.code)"
-                />
-                <span>{{ levelLabel(level) }}</span>
-            </label>
-        </div>
+            <div v-else class="flex flex-wrap gap-2">
+                <!-- `aria-pressed` porte l'état retenu : la couleur seule ne le dirait pas à un
+                     lecteur d'écran, et c'est ici toute l'information de l'écran. -->
+                <button
+                    v-for="level in catalogue" :key="level.id" type="button" class="chip"
+                    :aria-pressed="selected.includes(level.code)" @click="toggle(level.code)"
+                >{{ levelLabel(level) }}</button>
+            </div>
 
-        <div v-if="!loading" class="mt-6 flex items-center gap-3">
-            <button
-                class="btn-primary"
-                :disabled="saving || !dirty || !selected.length"
-                @click="save"
-            >
-                {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-            </button>
-            <span class="text-sm opacity-70">{{ selected.length }} niveau(x) sélectionné(s)</span>
-        </div>
+            <template #footer>
+                <span class="text-[12px]" style="color: var(--text-faint)">
+                    <b class="nu" style="color: var(--navy)">{{ selected.length }}</b>
+                    niveau{{ selected.length > 1 ? 'x' : '' }} retenu{{ selected.length > 1 ? 's' : '' }}
+                    sur {{ catalogue.length }}
+                </span>
+                <button
+                    class="btn-primary btn-sm" :disabled="saving || !dirty || !selected.length"
+                    @click="save"
+                >
+                    {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+                </button>
+            </template>
+        </UiCard>
     </div>
 </template>

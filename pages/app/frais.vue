@@ -39,22 +39,30 @@ const form = reactive({
     levelOfStudiesCodes: [] as string[],
 });
 
-/** Frais dont on édite l'échéancier. */
-const editing = ref<Fee | null>(null);
+/** Frais dont on consulte ou édite l'échéancier, affiché dans la colonne de droite. */
+const selected = ref<Fee | null>(null);
 const schedules = ref<Schedule[]>([]);
+const editing = ref(false);
 const savingSchedules = ref(false);
 const scheduleError = ref('');
 const scheduleMessage = ref('');
+const scheduleCounts = ref<Record<string, number>>({});
 
 const scheduledTotal = computed(() =>
     schedules.value.reduce((sum, s) => sum + (Number(s.amount) || 0), 0));
 
 const totalMatches = computed(() =>
-    editing.value ? Math.round(scheduledTotal.value) === Math.round(Number(editing.value.price)) : false);
+    selected.value ? Math.round(scheduledTotal.value) === Math.round(Number(selected.value.price)) : false);
 
 function formatAmount(value?: number | string) {
     const n = Number(value ?? 0);
-    return n.toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
+    return n.toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
+}
+
+function formatDate(value?: string) {
+    if (!value) return '—';
+    const [y, m, d] = value.slice(0, 10).split('-');
+    return d && m && y ? `${d}/${m}/${y}` : value;
 }
 
 async function load() {
@@ -63,6 +71,17 @@ async function load() {
     try {
         const result = await api<{ content: Fee[] }>('/fees', { query: { size: 100 } });
         fees.value = result.content ?? [];
+        // Le nombre de tranches se lit sur la liste : sans lui, la cadence d'un frais n'apparaît
+        // qu'après avoir cliqué dessus, et l'école ne voit pas d'un coup d'œil ce qui reste à
+        // découper.
+        await Promise.all(fees.value.map(async (fee) => {
+            try {
+                const existing = await api<Schedule[]>(`/fees/${fee.id}/schedules`);
+                scheduleCounts.value[fee.id] = existing.length;
+            } catch {
+                scheduleCounts.value[fee.id] = 0;
+            }
+        }));
     } catch {
         error.value = "Les frais n'ont pas pu être chargés.";
     } finally {
@@ -96,17 +115,25 @@ async function submit() {
     }
 }
 
-async function openSchedules(fee: Fee) {
-    editing.value = fee;
+async function select(fee: Fee) {
+    selected.value = fee;
+    editing.value = false;
     scheduleError.value = '';
     scheduleMessage.value = '';
     try {
         const existing = await api<Schedule[]>(`/fees/${fee.id}/schedules`);
-        schedules.value = existing.length
-            ? existing.map((s) => ({ ...s, dueDate: s.dueDate?.slice(0, 10) ?? '' }))
-            : [{ label: '1er versement', amount: fee.price, dueDate: '' }];
+        schedules.value = existing.map((s) => ({ ...s, dueDate: s.dueDate?.slice(0, 10) ?? '' }));
+        scheduleCounts.value[fee.id] = existing.length;
     } catch {
-        schedules.value = [{ label: '1er versement', amount: fee.price, dueDate: '' }];
+        schedules.value = [];
+    }
+}
+
+function startEditing() {
+    editing.value = true;
+    scheduleMessage.value = '';
+    if (!schedules.value.length && selected.value) {
+        schedules.value = [{ label: '1er versement', amount: selected.value.price, dueDate: '' }];
     }
 }
 
@@ -123,12 +150,12 @@ function removeSchedule(index: number) {
 }
 
 async function saveSchedules() {
-    if (!editing.value) return;
+    if (!selected.value) return;
     scheduleError.value = '';
     scheduleMessage.value = '';
     savingSchedules.value = true;
     try {
-        await api(`/fees/${editing.value.id}/schedules`, {
+        await api(`/fees/${selected.value.id}/schedules`, {
             method: 'PUT',
             body: schedules.value.map((s) => ({
                 label: s.label,
@@ -137,10 +164,13 @@ async function saveSchedules() {
             })),
         });
         scheduleMessage.value = 'Échéancier enregistré. Les élèves concernés ont reçu leurs tranches.';
+        scheduleCounts.value[selected.value.id] = schedules.value.length;
+        editing.value = false;
     } catch (e: any) {
         // Le service refuse la refonte d'un échéancier déjà encaissé, et impose que la somme
         // des tranches vaille le prix du frais.
-        scheduleError.value = e?.response?._data?.errors?.[0]?.defaultMessage
+        scheduleError.value = e?.data?.errors?.[0]?.defaultMessage
+            ?? e?.data?.debugMessage
             ?? "L'échéancier n'a pas pu être enregistré.";
     } finally {
         savingSchedules.value = false;
@@ -152,6 +182,9 @@ function toggleLevel(code: string) {
     if (i === -1) form.levelOfStudiesCodes.push(code);
     else form.levelOfStudiesCodes.splice(i, 1);
 }
+
+const totalExpected = computed(() =>
+    fees.value.reduce((sum, f) => sum + Number(f.price ?? 0), 0));
 
 onMounted(async () => {
     try {
@@ -165,135 +198,236 @@ onMounted(async () => {
 
 <template>
     <div>
-        <div class="page-header">
-            <div>
-                <h1 class="page-title">Frais</h1>
-                <p class="mt-1 opacity-70 max-w-2xl">
-                    Un frais s'applique aux élèves des niveaux ciblés. Son échéancier détermine
-                    les tranches que les familles auront à régler.
+        <PageHead
+            title="Frais et échéanciers"
+            sub="Définis par niveau, appliqués automatiquement aux élèves concernés"
+        >
+            <template #actions>
+                <button class="btn-primary" @click="showForm = !showForm">
+                    {{ showForm ? 'Annuler' : 'Nouveau frais' }}
+                </button>
+            </template>
+        </PageHead>
+
+        <p v-if="error" class="alert-danger mb-3.5" role="alert">{{ error }}</p>
+
+        <UiCard v-if="showForm" class="mb-3.5" title="Nouveau frais" sub="Montant total, avant découpage en tranches">
+            <form @submit.prevent="submit">
+                <p v-if="!levelOptions.length" class="alert-danger mb-4">
+                    Aucun niveau déclaré. Renseignez d'abord
+                    <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
                 </p>
-            </div>
-            <button class="btn-primary" @click="showForm = !showForm">
-                {{ showForm ? 'Annuler' : 'Nouveau frais' }}
-            </button>
-        </div>
+                <div class="grid gap-3.5 sm:grid-cols-2">
+                    <div>
+                        <label class="field-label" for="name">Libellé</label>
+                        <input
+                            id="name" v-model="form.name" type="text" required
+                            placeholder="Scolarité annuelle" class="input"
+                        />
+                    </div>
+                    <div>
+                        <label class="field-label" for="price">Montant total (FCFA)</label>
+                        <input id="price" v-model="form.price" type="number" min="1" required class="input" />
+                    </div>
+                </div>
 
-        <form v-if="showForm" class="card-pad mt-6"
-              @submit.prevent="submit">
-            <h2 class="section-title">Nouveau frais</h2>
-            <p v-if="!levelOptions.length" class="mb-4 text-sm">
-                Aucun niveau déclaré. Renseignez d'abord
-                <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
-            </p>
-            <div class="grid gap-4 sm:grid-cols-2">
-                <label class="field-label">Libellé
-                    <input v-model="form.name" type="text" required placeholder="Scolarité annuelle"
-                           class="input mt-1" />
-                </label>
-                <label class="field-label">Montant total (FCFA)
-                    <input v-model="form.price" type="number" min="1" required
-                           class="input mt-1" />
-                </label>
-            </div>
+                <fieldset class="mt-4">
+                    <legend class="field-label">Niveaux concernés</legend>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="level in levelOptions" :key="level.id" type="button" class="chip"
+                            :aria-pressed="form.levelOfStudiesCodes.includes(level.code)"
+                            @click="toggleLevel(level.code)"
+                        >{{ levelLabel(level) }}</button>
+                    </div>
+                </fieldset>
 
-            <fieldset class="mt-4">
-                <legend class="text-sm mb-2">Niveaux concernés</legend>
-                <div class="flex flex-wrap gap-2">
-                    <label v-for="level in levelOptions" :key="level.id"
-                           class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer" style="border: 1px solid var(--border)"
-                           :class="form.levelOfStudiesCodes.includes(level.code) ? 'bg-nelima-50 dark:bg-white/10 border-nelima-300' : ''">
-                        <input type="checkbox" :checked="form.levelOfStudiesCodes.includes(level.code)"
-                               @change="toggleLevel(level.code)" />
-                        {{ levelLabel(level) }}
+                <div class="mt-4 flex gap-6 text-sm">
+                    <label class="flex items-center gap-2">
+                        <input v-model="form.optional" type="checkbox" /> Frais optionnel
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input v-model="form.academical" type="checkbox" /> Frais de scolarité
                     </label>
                 </div>
-            </fieldset>
 
-            <div class="mt-4 flex gap-6 text-sm">
-                <label class="flex items-center gap-2">
-                    <input v-model="form.optional" type="checkbox" /> Frais optionnel
-                </label>
-                <label class="flex items-center gap-2">
-                    <input v-model="form.academical" type="checkbox" /> Frais de scolarité
-                </label>
-            </div>
+                <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
 
-            <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
-
-            <button type="submit"
+                <button
+                    type="submit" class="btn-primary mt-4"
                     :disabled="saving || !form.name || !form.price || !form.levelOfStudiesCodes.length"
-                    class="btn-primary mt-4">
-                {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
-            </button>
-        </form>
+                >
+                    {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+                </button>
+            </form>
+        </UiCard>
 
-        <p v-if="error" class="alert-danger mt-4" role="alert">{{ error }}</p>
-        <p v-if="loading" class="mt-6 opacity-70">Chargement…</p>
-
-        <div v-else-if="!fees.length" class="mt-6 opacity-70">
-            Aucun frais défini. Créez-en un pour commencer à facturer les familles.
-        </div>
-
-        <div v-else class="mt-6 space-y-3">
-            <div v-for="fee in fees" :key="fee.id"
-                 class="card-pad">
-                <div class="page-header">
-                    <div>
-                        <p class="font-medium">
-                            {{ fee.name }}
-                            <span v-if="fee.optional" class="ml-2 text-xs opacity-60">optionnel</span>
-                        </p>
-                        <p class="text-sm opacity-70">{{ formatAmount(fee.price) }}</p>
-                        <p class="text-sm opacity-60 mt-1">
-                            {{ (fee.levelOfStudies ?? []).map(levelLabel).join(', ') || 'Aucun niveau' }}
-                        </p>
-                    </div>
-                    <button class="btn-secondary btn-sm"
-                            @click="editing?.id === fee.id ? (editing = null) : openSchedules(fee)">
-                        {{ editing?.id === fee.id ? 'Fermer' : 'Échéancier' }}
-                    </button>
+        <div class="grid-12">
+            <UiCard
+                style="grid-column: span 8" :pad="false"
+                title="Frais de l'établissement"
+                sub="Cliquez sur une ligne pour voir la répartition en tranches"
+            >
+                <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Frais</th>
+                                <th>Niveaux</th>
+                                <th class="text-right">Montant total</th>
+                                <th>Échéancier</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="loading">
+                                <td colspan="4" class="py-8 text-center" style="color: var(--text-faint)">
+                                    Chargement…
+                                </td>
+                            </tr>
+                            <tr
+                                v-for="fee in fees" v-else :key="fee.id" class="cursor-pointer"
+                                :style="selected?.id === fee.id ? 'background: var(--brand-50)' : ''"
+                                @click="select(fee)"
+                            >
+                                <td>
+                                    <div class="nm">
+                                        <b>{{ fee.name }}</b>
+                                        <span>{{ fee.optional ? 'Optionnel' : 'Obligatoire' }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span
+                                        v-for="level in (fee.levelOfStudies ?? []).slice(0, 3)"
+                                        :key="level.id" class="tag mr-1"
+                                    >{{ levelLabel(level) }}</span>
+                                    <span
+                                        v-if="(fee.levelOfStudies ?? []).length > 3"
+                                        class="text-[11.5px]" style="color: var(--text-faint)"
+                                    >+{{ (fee.levelOfStudies ?? []).length - 3 }}</span>
+                                    <span
+                                        v-if="!(fee.levelOfStudies ?? []).length"
+                                        class="text-[11.5px]" style="color: var(--text-faint)"
+                                    >Aucun niveau</span>
+                                </td>
+                                <td class="num" style="color: var(--navy)">{{ formatAmount(fee.price) }}</td>
+                                <td>
+                                    <UiPill :tone="scheduleCounts[fee.id] ? 'ok' : 'warn'">
+                                        {{ scheduleCounts[fee.id]
+                                            ? `${scheduleCounts[fee.id]} tranche${scheduleCounts[fee.id] > 1 ? 's' : ''}`
+                                            : 'À découper' }}
+                                    </UiPill>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <div v-if="editing?.id === fee.id" class="mt-4 pt-4" style="border-top: 1px solid var(--border)">
-                    <div v-for="(schedule, index) in schedules" :key="index"
-                         class="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] items-end mb-3">
-                        <label class="field-label">Libellé
-                            <input v-model="schedule.label" type="text"
-                                   class="input mt-1" />
-                        </label>
-                        <label class="field-label">Montant
-                            <input v-model="schedule.amount" type="number" min="1"
-                                   class="input mt-1 w-36" />
-                        </label>
-                        <label class="field-label">Échéance
-                            <input v-model="schedule.dueDate" type="date"
-                                   class="input mt-1" />
-                        </label>
-                        <button type="button" class="text-sm underline opacity-70 pb-2"
-                                @click="removeSchedule(index)">Retirer</button>
+                <EmptyState
+                    v-if="!loading && !fees.length"
+                    title="Aucun frais défini"
+                    text="Créez vos frais de scolarité, de cantine ou de transport, puis répartissez-les en tranches datées."
+                />
+
+                <template #footer>
+                    <span class="text-[12px]" style="color: var(--text-faint)">
+                        <b class="nu" style="color: var(--navy)">{{ fees.length }}</b>
+                        frais · <b class="nu" style="color: var(--navy)">{{ formatAmount(totalExpected) }}</b>
+                        par élève concerné, tous frais cumulés
+                    </span>
+                </template>
+            </UiCard>
+
+            <UiCard
+                style="grid-column: span 4" :pad="false"
+                :title="selected ? selected.name : 'Détail de l\'échéancier'"
+                :sub="selected ? formatAmount(selected.price) : 'Sélectionnez un frais dans la liste'"
+            >
+                <template v-if="selected" #action>
+                    <button v-if="!editing" class="btn-secondary btn-sm" @click="startEditing">
+                        {{ schedules.length ? 'Modifier' : 'Découper' }}
+                    </button>
+                    <button v-else class="btn-secondary btn-sm" @click="select(selected)">
+                        Annuler
+                    </button>
+                </template>
+
+                <EmptyState
+                    v-if="!selected"
+                    title="Aucun frais sélectionné"
+                    text="La répartition en tranches et leurs échéances s'affichent ici."
+                />
+
+                <template v-else-if="!editing">
+                    <div v-if="schedules.length" class="lst">
+                        <div
+                            v-for="(schedule, index) in schedules" :key="schedule.id ?? index"
+                            class="flex items-center gap-3"
+                        >
+                            <div
+                                class="w-7 h-7 rounded-lg grid place-items-center text-[12px] font-extrabold nu shrink-0"
+                                style="background: var(--brand-50); color: var(--brand-700)"
+                            >{{ index + 1 }}</div>
+                            <div class="nm flex-1 min-w-0">
+                                <b>{{ schedule.label }}</b>
+                                <span class="nu">Échéance {{ formatDate(schedule.dueDate) }}</span>
+                            </div>
+                            <b class="nu text-[12.5px]" style="color: var(--navy)">
+                                {{ formatAmount(schedule.amount) }}
+                            </b>
+                        </div>
                     </div>
 
-                    <button type="button" class="text-sm underline" @click="addSchedule">
+                    <EmptyState
+                        v-else
+                        title="Frais non découpé"
+                        text="Sans échéancier, aucune tranche n'est due par les familles et le frais reste sans effet."
+                    />
+
+                    <p v-if="scheduleMessage" class="alert-success m-4">{{ scheduleMessage }}</p>
+                </template>
+
+                <div v-else class="card-b">
+                    <div
+                        v-for="(schedule, index) in schedules" :key="index"
+                        class="grid gap-2 mb-3" style="grid-template-columns: 1fr 110px auto"
+                    >
+                        <input v-model="schedule.label" type="text" class="input" aria-label="Libellé" />
+                        <input
+                            v-model="schedule.amount" type="number" min="1" class="input text-right"
+                            aria-label="Montant"
+                        />
+                        <input v-model="schedule.dueDate" type="date" class="input" aria-label="Échéance" />
+                        <button
+                            type="button" class="text-[12px] underline col-span-3 text-left"
+                            style="color: var(--text-faint)" @click="removeSchedule(index)"
+                        >Retirer la tranche {{ index + 1 }}</button>
+                    </div>
+
+                    <button type="button" class="btn-secondary btn-sm" @click="addSchedule">
                         Ajouter une tranche
                     </button>
 
-                    <p class="mt-3 text-sm" :class="totalMatches ? 'opacity-70' : 'text-red-600'">
-                        Total des tranches : {{ formatAmount(scheduledTotal) }}
-                        <span v-if="!totalMatches">
-                            — doit valoir {{ formatAmount(fee.price) }}
-                        </span>
+                    <!-- La somme doit valoir le prix du frais : le serveur le refuse sinon, autant
+                         le dire pendant la saisie plutôt qu'après l'envoi. -->
+                    <p
+                        class="mt-3 text-[12.5px]"
+                        :style="totalMatches ? 'color: var(--text-faint)' : 'color: var(--danger)'"
+                    >
+                        Total des tranches : <b class="nu">{{ formatAmount(scheduledTotal) }}</b>
+                        <span v-if="!totalMatches"> — doit valoir {{ formatAmount(selected.price) }}</span>
                     </p>
 
-                    <p v-if="scheduleError" class="mt-2 text-sm text-red-600" role="alert">{{ scheduleError }}</p>
-                    <p v-if="scheduleMessage" class="alert-success mt-2">{{ scheduleMessage }}</p>
+                    <p v-if="scheduleError" class="alert-danger mt-3" role="alert">{{ scheduleError }}</p>
 
-                    <button type="button" :disabled="savingSchedules || !schedules.length || !totalMatches"
-                            class="btn-primary mt-3"
-                            @click="saveSchedules">
+                    <button
+                        type="button" class="btn-primary mt-3 w-full"
+                        :disabled="savingSchedules || !schedules.length || !totalMatches"
+                        @click="saveSchedules"
+                    >
                         {{ savingSchedules ? 'Enregistrement…' : "Enregistrer l'échéancier" }}
                     </button>
                 </div>
-            </div>
+            </UiCard>
         </div>
     </div>
 </template>
