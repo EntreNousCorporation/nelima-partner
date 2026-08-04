@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-    fillingRate, kindLabel, slotLabel, statusLabel, type Activity, type ActivityEnrollment,
+    activityFillingRate, kindLabel, slotLabel, statusLabel, type Activity, type ActivityEnrollment,
 } from '~/composables/useActivities';
 
 /**
@@ -30,7 +30,7 @@ const waiting = computed(() => mine.value
     .filter((line) => line.status === 'WAITLISTED')
     .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt)));
 
-const filling = computed(() => fillingRate(props.activity));
+const filling = computed(() => activityFillingRate(props.activity));
 const full = computed(() => props.activity.enrolledCount >= props.activity.capacity);
 
 async function load() {

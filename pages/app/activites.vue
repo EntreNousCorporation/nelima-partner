@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-    ACTIVITY_KINDS, ACTIVITY_STATUSES, WEEK_DAYS, fillingRate, kindLabel, slotLabel, statusLabel,
+    ACTIVITY_KINDS, ACTIVITY_STATUSES, WEEK_DAYS, activityFillingRate, kindLabel, slotLabel, statusLabel,
     type Activity, type ActivityEnrollment, type ActivityKind, type ActivityStatus,
 } from '~/composables/useActivities';
 import { CYCLES, cycleLabel, type EducationCycle } from '~/composables/useStudents';
@@ -513,10 +513,10 @@ onMounted(async () => {
                                             <i
                                                 class="block h-full rounded-full"
                                                 :style="{
-                                                    width: `${Math.min(100, fillingRate(row))}%`,
+                                                    width: `${Math.min(100, activityFillingRate(row))}%`,
                                                     background: row.enrolledCount >= row.capacity
                                                         ? 'var(--danger-solid)'
-                                                        : fillingRate(row) > 85
+                                                        : activityFillingRate(row) > 85
                                                             ? 'var(--warning-solid)' : 'var(--brand-600)',
                                                 }"
                                             />

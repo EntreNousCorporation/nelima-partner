@@ -108,7 +108,7 @@ export function slotLabel(activity: Activity) {
 }
 
 /** Part des places occupées. Une activité sans capacité ne se compare à rien. */
-export function fillingRate(activity: Activity) {
+export function activityFillingRate(activity: Activity) {
     if (!activity.capacity) return 0;
     return (activity.enrolledCount / activity.capacity) * 100;
 }
