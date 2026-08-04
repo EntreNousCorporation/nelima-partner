@@ -117,6 +117,19 @@ export type AttendanceSummary = {
     presenceRate?: number;
 };
 
+export type PayrollSummary = {
+    monthlyPayroll: number;
+    /** Sans lui, la masse salariale se lirait comme couvrant tout l'effectif. */
+    paidHeadcount: number;
+    headcount: number;
+    /** Moyenne sur les seules fiches renseignées ; nulle quand aucune ne l'est. */
+    averageSalary?: number;
+    byContract: Partial<Record<ContractType, number>>;
+    withoutContract: number;
+    averageSeniorityYears?: number;
+    weeklyTeachingHours: number;
+};
+
 export function useStaff() {
     const api = useApi();
 
@@ -166,8 +179,13 @@ export function useStaff() {
         });
     }
 
+    /** Masse salariale et répartition des contrats. Refusé sans le droit de lire les salaires. */
+    function payrollSummary() {
+        return api<PayrollSummary>('/staff/payroll-summary');
+    }
+
     return {
         list, findById, create, update, remove, assignClasses, unassignClass,
-        attendanceSheet, recordAttendance, attendanceSummary,
+        attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
     };
 }

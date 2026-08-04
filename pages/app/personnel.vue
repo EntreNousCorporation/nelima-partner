@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
     ATTENDANCE_STATUSES, CONTRACT_TYPES, STAFF_ROLES, attendanceLabel, contractLabel, fullName,
-    staffRoleLabel,
+    seniorityYears, staffRoleLabel,
     type AttendanceLine, type AttendanceStatus, type AttendanceSummary, type ContractType,
-    type StaffMember, type StaffRole,
+    type PayrollSummary, type StaffMember, type StaffRole,
 } from '~/composables/useStaff';
 import type { SchoolClass } from '~/composables/useClasses';
 
@@ -13,7 +13,10 @@ import type { SchoolClass } from '~/composables/useClasses';
  * Deux onglets ici : l'annuaire, et les affectations vues depuis la classe. Les présences, les
  * contrats et les accès viennent ensuite, et la barre d'onglets est faite pour les accueillir.
  */
-const { list, create, update, remove, attendanceSheet, recordAttendance, attendanceSummary } = useStaff();
+const {
+    list, create, update, remove,
+    attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
+} = useStaff();
 const { list: listClasses } = useClasses();
 const { can } = usePermissions();
 
@@ -22,7 +25,7 @@ const classes = ref<SchoolClass[]>([]);
 const loading = ref(true);
 const error = ref('');
 
-const tab = ref<'directory' | 'assignments' | 'attendance'>('directory');
+const tab = ref<'directory' | 'assignments' | 'attendance' | 'contracts'>('directory');
 const keyword = ref('');
 const selectedRole = ref<StaffRole | ''>('');
 const includeInactive = ref(false);
@@ -101,8 +104,25 @@ async function point(line: AttendanceLine, status: AttendanceStatus) {
     }
 }
 
+/* ---- Contrats ---- */
+const payroll = ref<PayrollSummary | null>(null);
+const payrollLoading = ref(false);
+
+async function loadPayroll() {
+    payrollLoading.value = true;
+    error.value = '';
+    try {
+        payroll.value = await payrollSummary();
+    } catch {
+        error.value = "La masse salariale n'a pas pu être chargée.";
+    } finally {
+        payrollLoading.value = false;
+    }
+}
+
 watch([tab, day], () => {
     if (tab.value === 'attendance') loadSheet();
+    if (tab.value === 'contracts') loadPayroll();
 });
 
 const filtered = computed(() => {
@@ -121,7 +141,8 @@ const teachers = computed(() => rows.value.filter((row) => row.role === 'TEACHER
 const weeklyHours = computed(() => teachers.value
     .reduce((sum, row) => sum + (row.weeklyHours ?? 0), 0));
 
-const payroll = computed(() => rows.value
+/** Masse salariale déduite de l'annuaire déjà chargé, pour l'indicateur d'en-tête. */
+const payrollFromDirectory = computed(() => rows.value
     .reduce((sum, row) => sum + Number(row.monthlySalary ?? 0), 0));
 
 const pointedToday = computed(() => rows.value.filter((row) => row.todayStatus).length);
@@ -379,7 +400,7 @@ onMounted(async () => {
             <div v-if="canReadSalary" class="card p-4" style="grid-column: span 3">
                 <span class="kpi-label">Masse salariale / mois</span>
                 <span class="kpi-value">
-                    {{ Math.round(payroll).toLocaleString('fr-FR') }}<small>FCFA</small>
+                    {{ Math.round(payrollFromDirectory).toLocaleString('fr-FR') }}<small>FCFA</small>
                 </span>
                 <span class="kpi-foot">
                     {{ rows.filter((r) => r.monthlySalary).length }} salarié(s) renseigné(s)
@@ -401,6 +422,10 @@ onMounted(async () => {
                         class="chip" :aria-pressed="tab === 'attendance'"
                         @click="tab = 'attendance'"
                     >Présences</button>
+                    <button
+                        v-if="canReadSalary" class="chip" :aria-pressed="tab === 'contracts'"
+                        @click="tab = 'contracts'"
+                    >Contrats</button>
                 </div>
             </div>
 
@@ -570,7 +595,7 @@ onMounted(async () => {
                 />
             </template>
 
-            <template v-else>
+            <template v-else-if="tab === 'attendance'">
                 <div class="tbar">
                     <label class="inp" style="flex: 0 0 auto">
                         <span class="text-[12.5px]" style="color: var(--text-faint)">Journée</span>
@@ -655,14 +680,129 @@ onMounted(async () => {
                 />
             </template>
 
+            <template v-else>
+                <p v-if="payrollLoading" class="py-8 text-center text-[12.5px]" style="color: var(--text-faint)">
+                    Chargement…
+                </p>
+                <template v-else-if="payroll">
+                    <div class="grid-12 p-4">
+                        <div class="card p-4" style="grid-column: span 3">
+                            <span class="kpi-label">Masse salariale / mois</span>
+                            <span class="kpi-value">
+                                {{ Math.round(payroll.monthlyPayroll).toLocaleString('fr-FR') }}<small>FCFA</small>
+                            </span>
+                            <!-- Le dénominateur est dit : sans lui, ce total se lirait comme
+                                 couvrant tout l'effectif alors qu'il ne couvre que les fiches
+                                 complétées. -->
+                            <span class="kpi-foot">
+                                sur {{ payroll.paidHeadcount }} fiche(s) renseignée(s)
+                                / {{ payroll.headcount }}
+                            </span>
+                        </div>
+                        <div class="card p-4" style="grid-column: span 3">
+                            <span class="kpi-label">Salaire moyen</span>
+                            <span class="kpi-value">
+                                <template v-if="payroll.averageSalary != null">
+                                    {{ Math.round(payroll.averageSalary).toLocaleString('fr-FR') }}<small>FCFA</small>
+                                </template>
+                                <template v-else>—</template>
+                            </span>
+                            <span class="kpi-foot">hors fiches sans salaire</span>
+                        </div>
+                        <div class="card p-4" style="grid-column: span 3">
+                            <span class="kpi-label">Ancienneté moyenne</span>
+                            <span class="kpi-value">
+                                <template v-if="payroll.averageSeniorityYears != null">
+                                    {{ payroll.averageSeniorityYears }}<small>ans</small>
+                                </template>
+                                <template v-else>—</template>
+                            </span>
+                            <span class="kpi-foot">sur les dates d'embauche connues</span>
+                        </div>
+                        <div class="card p-4" style="grid-column: span 3">
+                            <span class="kpi-label">Heures enseignées / sem.</span>
+                            <span class="kpi-value">{{ payroll.weeklyTeachingHours }}<small>h</small></span>
+                            <span class="kpi-foot">assurées par les enseignants</span>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Contrat</th>
+                                    <th class="text-right">Effectif</th>
+                                    <th class="text-right">Part de l'effectif</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="contract in CONTRACT_TYPES" :key="contract.value">
+                                    <td><span class="tag">{{ contract.label }}</span></td>
+                                    <td class="num">{{ payroll.byContract[contract.value] ?? 0 }}</td>
+                                    <td class="num">
+                                        {{ payroll.headcount
+                                            ? Math.round((payroll.byContract[contract.value] ?? 0)
+                                                / payroll.headcount * 100)
+                                            : 0 }} %
+                                    </td>
+                                </tr>
+                                <tr v-if="payroll.withoutContract">
+                                    <td style="color: var(--text-faint)">Contrat non renseigné</td>
+                                    <td class="num">{{ payroll.withoutContract }}</td>
+                                    <td class="num">
+                                        {{ Math.round(payroll.withoutContract / payroll.headcount * 100) }} %
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Membre</th>
+                                    <th>Contrat</th>
+                                    <th>Ancienneté</th>
+                                    <th class="text-right">Heures / sem.</th>
+                                    <th class="text-right">Brut mensuel</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in rows" :key="row.id">
+                                    <td>
+                                        <b class="text-sm font-extrabold" style="color: var(--navy)">
+                                            {{ fullName(row) }}
+                                        </b>
+                                    </td>
+                                    <td><span class="tag">{{ contractLabel(row.contractType) }}</span></td>
+                                    <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                        {{ seniorityYears(row) !== null
+                                            ? `${seniorityYears(row)} an(s)` : '—' }}
+                                    </td>
+                                    <td class="num">{{ row.weeklyHours ?? '—' }}</td>
+                                    <td class="num">
+                                        {{ row.monthlySalary
+                                            ? `${Math.round(Number(row.monthlySalary)).toLocaleString('fr-FR')} F`
+                                            : '—' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+            </template>
+
             <template #footer>
                 <span class="text-[12px]" style="color: var(--text-faint)">
                     <b class="nu" style="color: var(--navy)">
                         {{ tab === 'directory' ? filtered.length
-                            : tab === 'assignments' ? assignments.length : sheet.length }}
+                            : tab === 'assignments' ? assignments.length
+                                : tab === 'attendance' ? sheet.length : rows.length }}
                     </b>
                     {{ tab === 'directory' ? 'membre(s) affiché(s)'
-                        : tab === 'assignments' ? 'classe(s)' : 'ligne(s) de pointage' }}
+                        : tab === 'assignments' ? 'classe(s)'
+                            : tab === 'attendance' ? 'ligne(s) de pointage' : 'contrat(s)' }}
                 </span>
             </template>
         </UiCard>
