@@ -6,6 +6,7 @@ export type SchoolClass = {
     mainTeacherName?: string;
     levelCode?: string;
     levelLabel?: string;
+    cycle?: import('~/composables/useStudents').EducationCycle;
     studentCount: number;
     outstandingAmount: number;
     collectedAmount: number;

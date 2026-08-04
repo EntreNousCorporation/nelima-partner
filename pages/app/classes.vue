@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth';
 import { fillingRate, type SchoolClass } from '~/composables/useClasses';
-import { levelLabel, type LevelOfStudy } from '~/composables/useStudents';
+import { CYCLES, cycleLabel, levelLabel, type EducationCycle, type LevelOfStudy } from '~/composables/useStudents';
 
 const auth = useAuthStore();
 const { list, create, update, remove } = useClasses();
@@ -13,7 +13,8 @@ const loading = ref(true);
 const error = ref('');
 
 const keyword = ref('');
-const selectedLevel = ref('');
+/** Filtre par cycle, comme la maquette : c'est ainsi qu'une direction regarde ses classes. */
+const selectedCycle = ref<EducationCycle | '' | 'other'>('');
 
 const opened = ref<SchoolClass | null>(null);
 
@@ -33,7 +34,10 @@ const form = reactive({
 const filtered = computed(() => {
     const q = keyword.value.trim().toLowerCase();
     return rows.value.filter((row) => {
-        if (selectedLevel.value && row.levelCode !== selectedLevel.value) return false;
+        if (selectedCycle.value === 'other' && row.cycle) return false;
+        if (selectedCycle.value && selectedCycle.value !== 'other' && row.cycle !== selectedCycle.value) {
+            return false;
+        }
         if (!q) return true;
         return row.name.toLowerCase().includes(q)
             || (row.mainTeacherName ?? '').toLowerCase().includes(q);
@@ -43,20 +47,42 @@ const filtered = computed(() => {
 const totalStudents = computed(() => rows.value.reduce((sum, r) => sum + r.studentCount, 0));
 const totalCapacity = computed(() => rows.value.reduce((sum, r) => sum + (r.capacity ?? 0), 0));
 
-/** Remplissage par niveau, comme le prototype le présente en tête d'écran. */
-const byLevel = computed(() => {
-    const groups = new Map<string, { label: string; students: number; capacity: number; count: number }>();
-    for (const row of rows.value) {
-        const key = row.levelCode ?? '—';
-        const group = groups.get(key)
-            ?? { label: row.levelLabel ?? 'Niveau non renseigné', students: 0, capacity: 0, count: 0 };
-        group.students += row.studentCount;
-        group.capacity += row.capacity ?? 0;
-        group.count += 1;
-        groups.set(key, group);
+/**
+ * Remplissage par cycle, comme la maquette le présente en tête d'écran.
+ *
+ * Les quatre cycles figurent toujours, même vides : une direction lit cette rangée comme un état
+ * des lieux, et une colonne qui disparaît parce qu'aucune classe n'y est encore ouverte se lit
+ * comme un oubli plutôt que comme un zéro.
+ */
+const byCycle = computed(() => {
+    const cycles = CYCLES.map((cycle) => {
+        const classes = rows.value.filter((row) => row.cycle === cycle.value);
+        return {
+            key: cycle.value as string,
+            label: cycle.label,
+            count: classes.length,
+            students: classes.reduce((sum, row) => sum + row.studentCount, 0),
+            capacity: classes.reduce((sum, row) => sum + (row.capacity ?? 0), 0),
+        };
+    });
+
+    // Les classes sans niveau renseigné ne se rangent nulle part : plutôt que de les taire, elles
+    // forment une colonne qui n'apparaît que si elles existent.
+    const orphans = rows.value.filter((row) => !row.cycle);
+    if (orphans.length) {
+        cycles.push({
+            key: 'other',
+            label: 'Autres niveaux',
+            count: orphans.length,
+            students: orphans.reduce((sum, row) => sum + row.studentCount, 0),
+            capacity: orphans.reduce((sum, row) => sum + (row.capacity ?? 0), 0),
+        });
     }
-    return [...groups.values()].slice(0, 4);
+    return cycles;
 });
+
+/** Des classes sans cycle existent : la puce de filtre correspondante n'a de sens que dans ce cas. */
+const hasOrphans = computed(() => rows.value.some((row) => !row.cycle));
 
 function openCreate() {
     editing.value = null;
@@ -213,16 +239,18 @@ onMounted(async () => {
             </form>
         </UiCard>
 
-        <div v-if="byLevel.length" class="grid-12 mb-3.5">
+        <div class="grid-12 mb-3.5">
             <div
-                v-for="group in byLevel" :key="group.label" class="card p-4"
-                :style="`grid-column: span ${Math.max(3, Math.floor(12 / byLevel.length))}`"
+                v-for="group in byCycle" :key="group.key" class="card p-4"
+                :style="`grid-column: span ${Math.max(2, Math.floor(12 / byCycle.length))}`"
             >
                 <span class="kpi-label">{{ group.label }}</span>
                 <span class="kpi-value">{{ group.students }}<small>élèves</small></span>
                 <span class="kpi-foot">
-                    {{ group.count }} classe{{ group.count > 1 ? 's' : '' }} ·
-                    {{ group.capacity ? Math.round(group.students / group.capacity * 100) : 0 }} % de remplissage
+                    {{ group.count }} classe{{ group.count > 1 ? 's' : '' }}
+                    <template v-if="group.capacity">
+                        · {{ Math.round(group.students / group.capacity * 100) }} % de remplissage
+                    </template>
                 </span>
             </div>
         </div>
@@ -243,13 +271,17 @@ onMounted(async () => {
                 </label>
 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button class="chip" :aria-pressed="!selectedLevel" @click="selectedLevel = ''">
-                        Tous niveaux
+                    <button class="chip" :aria-pressed="!selectedCycle" @click="selectedCycle = ''">
+                        Tous les cycles
                     </button>
                     <button
-                        v-for="level in levelOptions" :key="level.id" class="chip"
-                        :aria-pressed="selectedLevel === level.code" @click="selectedLevel = level.code"
-                    >{{ levelLabel(level) }}</button>
+                        v-for="cycle in CYCLES" :key="cycle.value" class="chip"
+                        :aria-pressed="selectedCycle === cycle.value" @click="selectedCycle = cycle.value"
+                    >{{ cycle.label }}</button>
+                    <button
+                        v-if="hasOrphans" class="chip"
+                        :aria-pressed="selectedCycle === 'other'" @click="selectedCycle = 'other'"
+                    >Autres niveaux</button>
                 </div>
             </div>
 
@@ -258,6 +290,7 @@ onMounted(async () => {
                     <thead>
                         <tr>
                             <th>Classe</th>
+                            <th>Cycle</th>
                             <th>Niveau</th>
                             <th>Titulaire</th>
                             <th>Salle</th>
@@ -268,7 +301,7 @@ onMounted(async () => {
                     </thead>
                     <tbody>
                         <tr v-if="loading">
-                            <td colspan="7" class="py-8 text-center" style="color: var(--text-faint)">
+                            <td colspan="8" class="py-8 text-center" style="color: var(--text-faint)">
                                 Chargement…
                             </td>
                         </tr>
@@ -286,6 +319,9 @@ onMounted(async () => {
                                         {{ row.name }}
                                     </b>
                                 </div>
+                            </td>
+                            <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                {{ cycleLabel(row.cycle) }}
                             </td>
                             <td><span class="tag">{{ row.levelLabel ?? '—' }}</span></td>
                             <td class="text-[12.5px] font-semibold" style="color: var(--text)">
@@ -333,7 +369,7 @@ onMounted(async () => {
             </div>
 
             <EmptyState
-                v-if="!loading && !filtered.length && (keyword || selectedLevel)"
+                v-if="!loading && !filtered.length && (keyword || selectedCycle)"
                 title="Aucun résultat"
                 text="Aucune classe ne correspond à ce filtre."
             />

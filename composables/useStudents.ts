@@ -1,9 +1,29 @@
+export type EducationCycle = 'KINDERGARTEN' | 'PRIMARY' | 'MIDDLE_SCHOOL' | 'HIGH_SCHOOL';
+
 export type LevelOfStudy = {
     id: string;
     code: string;
     position?: number;
     name?: { fr?: string; en?: string };
+    cycle?: EducationCycle;
 };
+
+/**
+ * Cycles, dans l'ordre de la scolarité.
+ *
+ * C'est la maille des chiffres d'ensemble : une école compte ses effectifs par cycle, pas niveau
+ * par niveau. Le libellé vient d'ici, le rattachement d'un niveau à son cycle vient du serveur.
+ */
+export const CYCLES: { value: EducationCycle; label: string }[] = [
+    { value: 'KINDERGARTEN', label: 'Maternelle' },
+    { value: 'PRIMARY', label: 'Primaire' },
+    { value: 'MIDDLE_SCHOOL', label: 'Collège' },
+    { value: 'HIGH_SCHOOL', label: 'Lycée' },
+];
+
+export function cycleLabel(cycle?: EducationCycle | null) {
+    return CYCLES.find((c) => c.value === cycle)?.label ?? 'Autres niveaux';
+}
 
 export type Student = {
     id: string;
