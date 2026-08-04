@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
-    ENTRY_KINDS, MONTHS, WEEK_DAY_LABELS, isoDate, entryKindLabel, entryKindTone, monthCells,
+    ENTRY_KINDS, MONTHS, WEEK_DAY_LABELS, compactAmount, isoDate, entryKindLabel, entryKindTone,
+    monthCells,
     type CalendarEntry, type CalendarEntryKind, type SchoolEventKind,
 } from '~/composables/useCalendar';
 import { CYCLES, type EducationCycle } from '~/composables/useStudents';
@@ -401,7 +402,7 @@ onMounted(async () => {
                             @click="opened = entry"
                         >
                             <template v-if="entry.kind === 'FEE_DUE' && canReadAmounts && entry.amountExpected">
-                                {{ Math.round(Number(entry.amountExpected) / 1000) }}k ·
+                                {{ compactAmount(entry.amountExpected) }} ·
                             </template>
                             {{ entry.title }}
                         </button>

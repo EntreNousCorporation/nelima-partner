@@ -99,6 +99,18 @@ export function monthCells(year: number, month: number): MonthCell[] {
     });
 }
 
+/**
+ * Montant abrégé pour une case du calendrier, où la place manque.
+ *
+ * Les milliers ne sont abrégés qu'au-delà de mille : arrondir 500 F donnait « 1k », soit le double
+ * de la somme réellement due. Sur un écran d'argent, un chiffre arrondi vers le haut est un chiffre
+ * faux, et personne ne va vérifier.
+ */
+export function compactAmount(amount: number) {
+    const value = Math.round(Number(amount));
+    return value >= 1000 ? `${Math.round(value / 1000)}k` : `${value} F`;
+}
+
 /** Part réglée d'une échéance. Nulle quand rien n'est attendu — distinct de zéro pour cent. */
 export function collectionRate(entry: CalendarEntry) {
     if (!entry.amountExpected || Number(entry.amountExpected) === 0) return null;
