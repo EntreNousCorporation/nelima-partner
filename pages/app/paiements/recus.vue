@@ -98,6 +98,8 @@ onMounted(() => {
             </template>
         </PageHead>
 
+        <PaymentsTabs />
+
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
         <UiCard :pad="false">

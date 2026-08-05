@@ -134,13 +134,13 @@ const steps = computed(() => [
         label: 'Définir les frais et leurs échéances',
         hint: 'Scolarité, cantine, transport — puis le découpage en tranches',
         done: (summary.value?.expectedThisMonth ?? 0) > 0,
-        to: '/app/frais',
+        to: '/app/paiements/frais',
     },
     {
         label: 'Encaisser un premier règlement',
         hint: 'Au guichet, ou en ligne depuis l\'application des parents',
         done: (summary.value?.receiptsThisMonth ?? 0) > 0,
-        to: '/app/encaissement',
+        to: '/app/paiements/guichet',
     },
 ]);
 
@@ -162,7 +162,7 @@ const today = computed(() => compact(summary.value?.collectedToday));
                     {{ auth.user?.establishmentName ?? 'Votre établissement' }} · {{ monthLabel }}
                 </p>
             </div>
-            <NuxtLink to="/app/encaissement" class="btn-primary">
+            <NuxtLink to="/app/paiements/guichet" class="btn-primary">
                 <svg
                     class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round"
@@ -392,7 +392,7 @@ const today = computed(() => compact(summary.value?.collectedToday));
                         <span class="text-[12px]" style="color: var(--text-faint)">
                             {{ summary?.receiptsThisMonth ?? 0 }} ce mois-ci
                         </span>
-                        <NuxtLink to="/app/recus" class="btn-secondary btn-sm">Tout voir</NuxtLink>
+                        <NuxtLink to="/app/paiements/recus" class="btn-secondary btn-sm">Tout voir</NuxtLink>
                     </div>
                 </section>
 
@@ -409,7 +409,7 @@ const today = computed(() => compact(summary.value?.collectedToday));
                                 Retards les plus élevés, un élève par ligne
                             </p>
                         </div>
-                        <NuxtLink to="/app/impayes" class="btn-secondary btn-sm">Tous les impayés</NuxtLink>
+                        <NuxtLink to="/app/paiements/relances" class="btn-secondary btn-sm">Tous les impayés</NuxtLink>
                     </div>
 
                     <div v-if="summary?.topOverdue?.length" class="table-wrap" style="border: 0; box-shadow: none">

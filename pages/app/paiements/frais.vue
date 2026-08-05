@@ -209,6 +209,8 @@ onMounted(async () => {
             </template>
         </PageHead>
 
+        <PaymentsTabs />
+
         <p v-if="error" class="alert-danger mb-3.5" role="alert">{{ error }}</p>
 
         <UiCard v-if="showForm" class="mb-3.5" title="Nouveau frais" sub="Montant total, avant découpage en tranches">

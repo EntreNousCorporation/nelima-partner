@@ -145,10 +145,10 @@ onMounted(async () => {
         </p>
 
         <template #footer>
-            <NuxtLink to="/app/encaissement" class="btn-primary flex-1">
+            <NuxtLink to="/app/paiements/guichet" class="btn-primary flex-1">
                 Encaisser au guichet
             </NuxtLink>
-            <NuxtLink :to="`/app/recus?q=${student.registrationNumber}`" class="btn-secondary">
+            <NuxtLink :to="`/app/paiements/recus?q=${student.registrationNumber}`" class="btn-secondary">
                 Ses reçus
             </NuxtLink>
         </template>

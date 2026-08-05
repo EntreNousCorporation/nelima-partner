@@ -143,9 +143,11 @@ onMounted(load);
     <div>
         <PageHead title="Encaissement" :sub="`Guichet · ${todayLabel}`">
             <template #actions>
-                <NuxtLink to="/app/recus" class="btn-secondary">Tous les reçus</NuxtLink>
+                <NuxtLink to="/app/paiements/recus" class="btn-secondary">Tous les reçus</NuxtLink>
             </template>
         </PageHead>
+
+        <PaymentsTabs />
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
@@ -328,7 +330,7 @@ onMounted(load);
                 title="Caisse du jour" :sub="todayLabel"
             >
                 <template #action>
-                    <NuxtLink to="/app/recus" class="btn-secondary btn-sm">Historique</NuxtLink>
+                    <NuxtLink to="/app/paiements/recus" class="btn-secondary btn-sm">Historique</NuxtLink>
                 </template>
 
                 <div class="flex flex-wrap" style="border-bottom: 1px solid var(--border)">

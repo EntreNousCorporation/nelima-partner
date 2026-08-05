@@ -116,7 +116,7 @@ function go(path: string) {
                         <button
                             v-for="receipt in found" :key="receipt.id"
                             class="flex items-center gap-2.5 px-3.5 py-2 w-full text-left hover:bg-[var(--surface-sunken)]"
-                            @click="go(`/app/recus?q=${encodeURIComponent(receipt.number)}`)"
+                            @click="go(`/app/paiements/recus?q=${encodeURIComponent(receipt.number)}`)"
                         >
                             <div class="nm flex-1 min-w-0">
                                 <b class="nu">{{ receipt.number }}</b>

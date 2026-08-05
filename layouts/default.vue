@@ -22,10 +22,7 @@ const route = useRoute();
  */
 const allTabs = [
     { label: 'Tableau de bord', to: '/app', icon: 'M4 19V10M9.5 19V5M15 19v-7M20.5 19v-11' },
-    { label: 'Paiements', to: '/app/encaissement', icon: 'M3 8h18v10H3zM3 8l2-4h14l2 4M8 13h8', permission: 'collection:write' },
-    { label: 'Impayés', to: '/app/impayes', icon: 'M12 8v5M12 16.5v.5M3.5 19h17L12 4z' },
-    { label: 'Reçus', to: '/app/recus', icon: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6' },
-    { label: 'Frais', to: '/app/frais', icon: 'M12 3v18M8 7h6a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h7', permission: 'fee:read' },
+    { label: 'Paiements', to: '/app/paiements', icon: 'M3 8h18v10H3zM3 8l2-4h14l2 4M8 13h8' },
     { label: 'Classes', to: '/app/classes', icon: 'M3 7l9-4 9 4-9 4zM7 11v5l5 3 5-3v-5', permission: 'class:read' },
     { label: 'Calendrier', to: '/app/calendrier', icon: 'M4 6h16v14H4zM4 10h16M9 3v4M15 3v4', permission: 'calendar:read' },
     { label: 'Activités', to: '/app/activites', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3.5 9h17M3.5 15h17M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18', permission: 'activity:read' },
