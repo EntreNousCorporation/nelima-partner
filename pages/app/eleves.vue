@@ -116,7 +116,7 @@ const form = reactive({
 
 const formComplete = computed(() =>
     Boolean(form.firstName && form.lastName && form.registrationNumber
-        && form.birthDay && form.placeOfBirth && form.levelOfStudyCode));
+        && form.birthDay && form.placeOfBirth && formClass.value && form.levelOfStudyCode));
 
 async function load() {
     loading.value = true;
@@ -266,9 +266,16 @@ onMounted(async () => {
 
         <UiCard v-if="showForm" class="mb-3.5" title="Nouvel élève" sub="Tous les champs sont requis">
             <form @submit.prevent="submit">
-                <p v-if="!levelOptions.length" class="alert-danger mb-4">
-                    Aucun niveau n'est déclaré pour votre établissement. Renseignez-les d'abord dans
-                    <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>.
+                <p v-if="!classOptions.length" class="alert-danger mb-4">
+                    <template v-if="!levelOptions.length">
+                        Aucun niveau n'est déclaré. Renseignez-les dans
+                        <NuxtLink to="/app/niveaux" class="underline">Niveaux enseignés</NuxtLink>,
+                        puis ouvrez des classes.
+                    </template>
+                    <template v-else>
+                        Aucune classe n'est ouverte : un élève s'inscrit dans une classe. Créez-en une
+                        dans <NuxtLink to="/app/classes" class="underline">Classes</NuxtLink>.
+                    </template>
                 </p>
                 <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
@@ -296,19 +303,10 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="formClass">Classe</label>
-                        <select id="formClass" v-model="formClass" class="select" @change="onFormClassChange">
-                            <option value="">Sans classe (à répartir plus tard)</option>
+                        <select id="formClass" v-model="formClass" required class="select" @change="onFormClassChange">
+                            <option value="" disabled>Choisir une classe…</option>
                             <option v-for="c in classOptions" :key="c.id" :value="c.id">
                                 {{ c.name }}<template v-if="c.levelLabel"> · {{ c.levelLabel }}</template>
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="field-label" for="level">Niveau</label>
-                        <select id="level" v-model="form.levelOfStudyCode" required class="select">
-                            <option value="" disabled>Choisir…</option>
-                            <option v-for="level in levelOptions" :key="level.id" :value="level.code">
-                                {{ levelLabel(level) }}
                             </option>
                         </select>
                     </div>
