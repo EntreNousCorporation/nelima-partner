@@ -194,8 +194,10 @@ onMounted(async () => {
         levelOptions.value = [];
     }
     try {
+        // Seul un enseignant tient une classe : la direction et l'administratif n'ont pas vocation
+        // à en être titulaires, et le backend le refuse désormais.
         teachers.value = (await listStaff())
-            .filter((member) => member.role === 'TEACHER' || member.role === 'DIRECTION');
+            .filter((member) => member.role === 'TEACHER');
     } catch {
         // Un rôle sans droit de lecture sur le personnel garde l'écran des classes utilisable :
         // le champ libre prend alors le relais.

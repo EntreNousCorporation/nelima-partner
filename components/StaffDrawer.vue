@@ -29,6 +29,9 @@ const seniority = computed(() => seniorityYears(props.member));
 const available = computed(() => props.classes
     .filter((schoolClass) => !props.member.classes.some((c) => c.id === schoolClass.id)));
 
+/** Seul un enseignant se rattache à une classe ; le backend refuse les autres profils. */
+const isTeacher = computed(() => props.member.role === 'TEACHER');
+
 async function add() {
     if (!picked.value) return;
     error.value = '';
@@ -123,8 +126,11 @@ async function detach(classId: string) {
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
         <p class="sec">Classes où il intervient</p>
+        <p v-if="!isTeacher" class="text-[12.5px] mb-3" style="color: var(--text-faint)">
+            Le rattachement à une classe est réservé au personnel enseignant.
+        </p>
         <div
-            v-if="member.classes.length" class="rounded-xl overflow-hidden mb-3"
+            v-else-if="member.classes.length" class="rounded-xl overflow-hidden mb-3"
             style="border: 1px solid var(--border)"
         >
             <div
@@ -149,7 +155,7 @@ async function detach(classId: string) {
             Aucune classe rattachée.
         </p>
 
-        <div v-if="canWrite && available.length" class="flex gap-2">
+        <div v-if="canWrite && isTeacher && available.length" class="flex gap-2">
             <select v-model="picked" class="select flex-1" aria-label="Classe à rattacher">
                 <option value="">Rattacher à une classe…</option>
                 <option v-for="schoolClass in available" :key="schoolClass.id" :value="schoolClass.id">
