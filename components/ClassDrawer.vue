@@ -2,6 +2,7 @@
 import { fillingRate, type SchoolClass } from '~/composables/useClasses';
 import { formatAmount } from '~/composables/useBilling';
 import { type Student } from '~/composables/useStudents';
+import { useAuthStore } from '~/stores/auth';
 
 /**
  * Détail d'une classe : ses attributs, son remplissage, ce que ses familles doivent, et la liste
@@ -15,6 +16,52 @@ const emit = defineEmits<{ close: []; changed: [] }>();
 
 const { assign, unassign } = useClasses();
 const { search } = useStudents();
+const auth = useAuthStore();
+
+function escapeHtml(value: string | number | undefined | null): string {
+    return String(value ?? '').replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] ?? c));
+}
+
+/**
+ * Ouvre une fenêtre imprimable avec la liste de la classe : en-tête (école, classe, titulaire,
+ * effectif, date) et un tableau numéroté avec une colonne libre pour l'émargement papier.
+ */
+function printRoster() {
+    const cls = props.schoolClass;
+    const school = auth.user?.establishmentName ?? 'Établissement';
+    const today = new Date().toLocaleDateString('fr-FR');
+    const meta = [cls.levelLabel, cls.room ? `salle ${cls.room}` : null,
+        cls.mainTeacherName ? `Titulaire : ${cls.mainTeacherName}` : null].filter(Boolean).join(' · ');
+    const rows = members.value.slice()
+        .sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'fr'))
+        .map((s, i) => `<tr><td class="n">${i + 1}</td><td>${escapeHtml(s.lastName)} ${escapeHtml(s.firstName)}</td>`
+            + `<td class="m">${escapeHtml(s.registrationNumber)}</td><td></td></tr>`)
+        .join('');
+    const html = '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+        + `<title>Liste — ${escapeHtml(cls.name)}</title><style>`
+        + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:24px}'
+        + '.s{font-size:13px;color:#444}h1{font-size:18px;margin:2px 0 4px}'
+        + '.meta{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#555;margin-bottom:14px}'
+        + 'table{width:100%;border-collapse:collapse;font-size:12.5px}'
+        + 'th,td{border:1px solid #999;padding:6px 8px;text-align:left}th{background:#f0f0f0}'
+        + "td.n{width:34px;text-align:center}td.m{font-family:'Courier New',monospace}"
+        + 'th:last-child,td:last-child{width:32%}'
+        + '@page{margin:16mm}@media print{body{margin:0}}'
+        + '</style></head><body>'
+        + `<div class="s">${escapeHtml(school)}</div>`
+        + `<h1>Liste de classe — ${escapeHtml(cls.name)}</h1>`
+        + `<div class="meta"><span>${escapeHtml(meta)}</span><span>Effectif : ${members.value.length} · ${today}</span></div>`
+        + '<table><thead><tr><th>N°</th><th>Nom et prénom</th><th>Matricule</th><th>Émargement</th></tr></thead>'
+        + `<tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#777">Aucun élève</td></tr>'}</tbody></table>`
+        + '</body></html>';
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 150);
+}
 
 const members = ref<Student[]>([]);
 const loading = ref(true);
@@ -195,7 +242,15 @@ onMounted(loadMembers);
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
-        <p class="sec">Élèves de la classe</p>
+        <div class="flex items-center justify-between" style="margin-bottom: 6px">
+            <p class="sec" style="margin: 0">Élèves de la classe</p>
+            <button
+                class="btn-secondary btn-sm" :disabled="loading || !members.length"
+                title="Imprimer la liste de la classe" @click="printRoster"
+            >
+                <BoIcon name="print" :size="14" /> Liste de classe
+            </button>
+        </div>
         <div v-if="loading" class="flex flex-col gap-2.5">
             <i v-for="n in 4" :key="n" class="sk h-6" />
         </div>
