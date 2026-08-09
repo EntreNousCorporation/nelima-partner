@@ -21,6 +21,23 @@ const outstanding = computed(() => dues.value
     .filter((i) => i.status === 'PENDING')
     .reduce((sum, i) => sum + Number(i.amount ?? 0), 0));
 
+// Échéancier regroupé par frais : on lit « scolarité : 3 tranches, cantine : 2 » au lieu d'une
+// liste plate où les tranches de plusieurs frais s'entremêlent sans qu'on sache à quoi elles tiennent.
+const duesByFee = computed(() => {
+    const groups = new Map<string, { fee: string; items: Installment[]; remaining: number }>();
+    for (const d of dues.value) {
+        const fee = d.studentFee?.fee?.name ?? 'Autres frais';
+        let g = groups.get(fee);
+        if (!g) {
+            g = { fee, items: [], remaining: 0 };
+            groups.set(fee, g);
+        }
+        g.items.push(d);
+        if (d.status === 'PENDING') g.remaining += Number(d.amount ?? 0);
+    }
+    return [...groups.values()];
+});
+
 const collected = computed(() => paid.value.reduce((sum, r) => sum + Number(r.amount ?? 0), 0));
 
 const today = new Date().toISOString().slice(0, 10);
@@ -140,22 +157,37 @@ onMounted(async () => {
         <div v-if="loading" class="flex flex-col gap-2.5 mb-5">
             <i v-for="n in 4" :key="n" class="sk h-6" />
         </div>
-        <div v-else-if="dues.length" class="rounded-xl overflow-hidden mb-5" style="border: 1px solid var(--border)">
+        <div v-else-if="duesByFee.length" class="flex flex-col gap-3 mb-5">
             <div
-                v-for="installment in dues" :key="installment.id"
-                class="flex items-center gap-3 px-3 py-2.5"
-                style="border-bottom: 1px solid var(--border)"
+                v-for="group in duesByFee" :key="group.fee"
+                class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)"
             >
-                <div class="nm flex-1 min-w-0">
-                    <b>{{ installment.label ?? 'Tranche' }}</b>
-                    <span class="nu">Échéance {{ formatDate(installment.dueDate) }}</span>
+                <div
+                    class="flex items-center gap-2 px-3 py-2"
+                    style="border-bottom: 1px solid var(--border); background: rgba(0, 0, 0, .025)"
+                >
+                    <b class="flex-1 min-w-0 text-[12.5px]" style="color: var(--navy)">{{ group.fee }}</b>
+                    <span class="nu text-[11.5px]" style="color: var(--text-faint)">
+                        <template v-if="group.remaining > 0">{{ formatAmount(group.remaining) }} à régler</template>
+                        <template v-else>Soldé</template>
+                    </span>
                 </div>
-                <b class="nu text-[12.5px]" style="color: var(--navy)">
-                    {{ formatAmount(installment.amount) }}
-                </b>
-                <UiPill :tone="installment.status === 'PAID' ? 'ok' : isLate(installment) ? 'late' : 'warn'">
-                    {{ installment.status === 'PAID' ? 'Réglée' : isLate(installment) ? 'En retard' : 'À venir' }}
-                </UiPill>
+                <div
+                    v-for="installment in group.items" :key="installment.id"
+                    class="flex items-center gap-3 px-3 py-2.5"
+                    style="border-bottom: 1px solid var(--border)"
+                >
+                    <div class="nm flex-1 min-w-0">
+                        <b>{{ installment.label ?? 'Tranche' }}</b>
+                        <span class="nu">Échéance {{ formatDate(installment.dueDate) }}</span>
+                    </div>
+                    <b class="nu text-[12.5px]" style="color: var(--navy)">
+                        {{ formatAmount(installment.amount) }}
+                    </b>
+                    <UiPill :tone="installment.status === 'PAID' ? 'ok' : isLate(installment) ? 'late' : 'warn'">
+                        {{ installment.status === 'PAID' ? 'Réglée' : isLate(installment) ? 'En retard' : 'À venir' }}
+                    </UiPill>
+                </div>
             </div>
         </div>
         <p v-else class="text-[12.5px] mb-5" style="color: var(--text-faint)">
