@@ -57,12 +57,12 @@ watch(query, (value) => {
     debounce = setTimeout(async () => {
         searching.value = true;
         try {
-            // Seuls les élèves sans classe sont proposés : déplacer un élève d'une classe à une
-            // autre est une autre opération, qui se fait depuis sa fiche et se voit.
-            const result = await search({
-                page: 0, size: 5, keyword: value, unassignedOnly: true,
-            });
-            candidates.value = result.content ?? [];
+            // Tous les élèves sont proposés, pas seulement ceux sans classe : choisir un élève déjà
+            // affecté ailleurs le DÉPLACE ici (l'affectation remplace sa classe). On n'écarte que
+            // ceux déjà dans CETTE classe, qui n'ont rien à y refaire.
+            const result = await search({ page: 0, size: 8, keyword: value });
+            candidates.value = (result.content ?? [])
+                .filter((s) => s.schoolClass?.id !== props.schoolClass.id);
         } finally {
             searching.value = false;
         }
@@ -158,8 +158,8 @@ onMounted(loadMembers);
         <div class="mb-1.5">
             <input
                 v-model="query" type="search" class="input"
-                placeholder="Nom ou matricule d'un élève sans classe"
-                aria-label="Rechercher un élève sans classe"
+                placeholder="Nom ou matricule d'un élève"
+                aria-label="Rechercher un élève"
             />
         </div>
         <p v-if="searching" class="text-[12px] mb-4" style="color: var(--text-faint)">Recherche…</p>
@@ -176,17 +176,21 @@ onMounted(loadMembers);
                 <AvatarBadge :name="`${candidate.firstName} ${candidate.lastName}`" :size="26" />
                 <div class="nm flex-1 min-w-0">
                     <b>{{ candidate.lastName }} {{ candidate.firstName }}</b>
-                    <span class="nu">{{ candidate.registrationNumber }}</span>
+                    <span class="nu">
+                        {{ candidate.registrationNumber
+                        }}<template v-if="candidate.schoolClass"> · déjà en {{ candidate.schoolClass.name }}</template>
+                    </span>
                 </div>
-                <span class="btn-secondary btn-sm">Affecter</span>
+                <span class="btn-secondary btn-sm">
+                    {{ candidate.schoolClass ? 'Déplacer' : 'Affecter' }}
+                </span>
             </button>
         </div>
         <p
             v-else-if="query.trim().length >= 2" class="text-[12px] mb-4"
             style="color: var(--text-faint)"
         >
-            Aucun élève sans classe ne correspond. Un élève déjà affecté ailleurs se déplace depuis
-            sa fiche.
+            Aucun élève ne correspond.
         </p>
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
