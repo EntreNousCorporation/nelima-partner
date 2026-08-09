@@ -12,7 +12,7 @@ import { useAuthStore } from '~/stores/auth';
  * de classe. D'où la recherche parmi les élèves non affectés, dans le même tiroir.
  */
 const props = defineProps<{ schoolClass: SchoolClass }>();
-const emit = defineEmits<{ close: []; changed: [] }>();
+const emit = defineEmits<{ close: []; changed: []; edit: [] }>();
 
 const { assign, unassign } = useClasses();
 const { search } = useStudents();
@@ -273,5 +273,14 @@ onMounted(loadMembers);
         <p v-else class="text-[12.5px]" style="color: var(--text-faint)">
             Classe vide. Affectez-y des élèves depuis le champ ci-dessus.
         </p>
+
+        <template #footer>
+            <!-- Modifier depuis le détail : c'est ici qu'on ouvre une classe pour la regarder, donc
+                 ici qu'on attend de pouvoir corriger son nom, son titulaire ou sa capacité. Le
+                 formulaire est celui de la liste — on ne le duplique pas, on le rouvre. -->
+            <button class="btn-primary flex-1" @click="emit('edit')">
+                <BoIcon name="edit" :size="16" /> Modifier la classe
+            </button>
+        </template>
     </SideDrawer>
 </template>

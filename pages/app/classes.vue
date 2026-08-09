@@ -178,6 +178,15 @@ async function refresh() {
     }
 }
 
+/** Passe du détail d'une classe à son formulaire de modification. */
+function editOpened() {
+    if (!opened.value) return;
+    openEdit(opened.value);
+    opened.value = null;
+    // Le formulaire s'ouvre en haut de la page : on y remonte, sinon il apparaît hors de vue.
+    if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 onMounted(async () => {
     try {
         levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
@@ -435,7 +444,7 @@ onMounted(async () => {
 
         <ClassDrawer
             v-if="opened" :school-class="opened"
-            @close="opened = null" @changed="refresh"
+            @close="opened = null" @changed="refresh" @edit="editOpened"
         />
     </div>
 </template>
