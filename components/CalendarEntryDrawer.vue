@@ -86,8 +86,8 @@ const notifiedLabel = computed(() => {
                     <div class="flex justify-between text-[12.5px] font-semibold mb-2">
                         <span style="color: var(--text-muted)">Déjà réglé</span>
                         <b class="nu" style="color: var(--navy)">
-                            {{ Math.round(Number(entry.amountCollected ?? 0)).toLocaleString('fr-FR') }}
-                            / {{ Math.round(Number(entry.amountExpected ?? 0)).toLocaleString('fr-FR') }} F
+                            {{ fm(Number(entry.amountCollected ?? 0)) }}
+                            / {{ fm(Number(entry.amountExpected ?? 0)) }} F
                         </b>
                     </div>
                     <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--surface-sunken)">
@@ -133,13 +133,15 @@ const notifiedLabel = computed(() => {
                     <button
                         v-if="canWrite && entry.visibleToFamilies" class="btn-secondary btn-sm"
                         @click="emit('notify', entry)"
-                    >{{ entry.lastNotifiedAt ? 'Prévenir à nouveau' : 'Prévenir les familles' }}</button>
+                    >
+                        <BoIcon name="send" :size="15" />{{ entry.lastNotifiedAt ? 'Prévenir à nouveau' : 'Prévenir les familles' }}</button>
                 </div>
             </div>
         </template>
 
         <template v-if="!isFeeDue && canWrite" #footer>
-            <button class="btn-primary" @click="emit('edit', entry); emit('close')">Modifier</button>
+            <button class="btn-primary" @click="emit('edit', entry); emit('close')">
+                <BoIcon name="edit" :size="16" />Modifier</button>
             <button class="btn-secondary" @click="emit('delete', entry)">Supprimer</button>
         </template>
     </SideDrawer>

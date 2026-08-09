@@ -53,7 +53,7 @@ function monthLabel(month: string) {
                     <div
                         class="w-[38%] rounded-t"
                         :style="{ height: row.expectedHeight, background: 'var(--border)' }"
-                        :title="`Attendu : ${Math.round(row.expected).toLocaleString('fr-FR')} F`"
+                        :title="`Attendu : ${fm(row.expected)} F`"
                     />
                     <div
                         class="w-[38%] rounded-t"
@@ -61,7 +61,7 @@ function monthLabel(month: string) {
                             height: row.collectedHeight,
                             background: row.alert ? 'var(--warning-solid)' : 'var(--brand-600)',
                         }"
-                        :title="`Encaissé : ${Math.round(row.collected).toLocaleString('fr-FR')} F`"
+                        :title="`Encaissé : ${fm(row.collected)} F`"
                     />
                 </div>
                 <span class="text-[11px] font-semibold" style="color: var(--text-faint)">

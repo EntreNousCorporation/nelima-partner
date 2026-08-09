@@ -84,15 +84,12 @@ onMounted(() => {
 <template>
     <div>
         <PageHead
-            title="Reçus"
+            title="Paiements"
             :sub="`${totalElements} pièce${totalElements > 1 ? 's' : ''} émise${totalElements > 1 ? 's' : ''} · numérotation continue et propre à votre établissement`"
         >
             <template #actions>
                 <a :href="exportUrl" download="encaissements.csv" class="btn-secondary">
-                    <svg
-                        class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round"
-                    ><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" /></svg>
+                    <BoIcon name="download" :size="16" />
                     Export comptable
                 </a>
             </template>
@@ -105,12 +102,7 @@ onMounted(() => {
         <UiCard :pad="false">
             <div class="tbar">
                 <label class="inp" style="flex: 0 1 260px">
-                    <svg
-                        class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round"
-                    >
-                        <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                    </svg>
+                    <BoIcon name="search" :size="15" />
                     <input
                         v-model="keyword" type="search" class="w-full"
                         placeholder="Numéro, élève, matricule, payeur…"
@@ -142,11 +134,7 @@ onMounted(() => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="loading">
-                            <td colspan="6" class="py-8 text-center" style="color: var(--text-faint)">
-                                Chargement…
-                            </td>
-                        </tr>
+                        <TableSkeleton v-if="loading" :columns="6" />
                         <tr
                             v-for="row in rows" v-else :key="row.id" class="cursor-pointer"
                             @click="opened = row"
@@ -183,12 +171,7 @@ onMounted(() => {
                                     :download="`recu-${row.number}.pdf`"
                                     class="btn-secondary btn-sm" @click.stop
                                 >
-                                    <svg
-                                        class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    >
-                                        <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" />
-                                    </svg>
+                                    <BoIcon name="download" :size="16" />
                                     PDF
                                 </a>
                             </td>

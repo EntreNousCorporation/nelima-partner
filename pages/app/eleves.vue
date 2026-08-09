@@ -1,5 +1,19 @@
 <script setup lang="ts">
 import { levelLabel, type LevelOfStudy, type Student } from '~/composables/useStudents';
+
+/**
+ * Statut de règlement d'un élève, déduit de son solde.
+ *
+ * Trois états et pas deux : devoir une somme échue n'est pas devoir une somme à venir. Le premier
+ * appelle une relance, le second se règle tout seul.
+ */
+function paymentState(student: Student) {
+    const outstanding = Number(student.outstandingAmount ?? 0);
+    const overdue = Number(student.overdueAmount ?? 0);
+    if (overdue > 0) return { label: 'En retard', tone: 'late' as const };
+    if (outstanding > 0) return { label: 'À échoir', tone: 'warn' as const };
+    return { label: 'À jour', tone: 'ok' as const };
+}
 import { type SchoolClass } from '~/composables/useClasses';
 
 import { useAuthStore } from '~/stores/auth';
@@ -22,6 +36,30 @@ const loadError = ref('');
 
 /** Élève dont la fiche est ouverte en tiroir. */
 const opened = ref<Student | null>(null);
+
+const { can } = usePermissions();
+
+/**
+ * Cartes de tête.
+ *
+ * Les trois premières se déduisent de ce que l'écran charge déjà ; la quatrième vient du tableau
+ * de bord, seul endroit qui agrège les retards. Aucune n'est inventée : une carte « départs
+ * depuis la rentrée », proposée par la maquette, supposerait une notion de radiation que le
+ * produit n'a pas — elle est donc absente plutôt que remplie d'un zéro trompeur.
+ */
+const withoutClass = computed(() => students.value.filter((row) => !row.schoolClass).length);
+const overdue = ref<{ count: number; amount: number } | null>(null);
+
+async function loadOverdue() {
+    if (!can('accounting:read')) return;
+    try {
+        const summary = await useApi()<{ overdueCount: number; overdueAmount: number }>(
+            '/dashboard/summary');
+        overdue.value = { count: summary.overdueCount, amount: summary.overdueAmount };
+    } catch {
+        overdue.value = null;
+    }
+}
 
 const showImport = ref(false);
 const importing = ref(false);
@@ -164,6 +202,7 @@ onMounted(async () => {
         classOptions.value = [];
     }
     await load();
+    await loadOverdue();
 });
 </script>
 
@@ -175,10 +214,12 @@ onMounted(async () => {
         >
             <template #actions>
                 <button class="btn-secondary" @click="showImport = !showImport; showForm = false">
-                    {{ showImport ? 'Annuler' : 'Importer un fichier' }}
+                    <BoIcon :name="showImport ? 'close' : 'upload'" :size="16" />
+                    {{ showImport ? 'Annuler' : 'Importer / exporter' }}
                 </button>
                 <button class="btn-primary" @click="showForm = !showForm; showImport = false">
-                    {{ showForm ? 'Annuler' : 'Nouvel élève' }}
+                    <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
+                    {{ showForm ? 'Annuler' : 'Inscrire un élève' }}
                 </button>
             </template>
         </PageHead>
@@ -200,6 +241,7 @@ onMounted(async () => {
                        @change="onFileChange" />
                 <p v-if="importError" class="alert-danger mt-3" role="alert">{{ importError }}</p>
                 <button type="submit" :disabled="importing || !importFile" class="btn-primary mt-4">
+                    <BoIcon name="upload" :size="16" />
                     {{ importing ? 'Import en cours…' : 'Importer' }}
                 </button>
             </form>
@@ -251,22 +293,51 @@ onMounted(async () => {
                 <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
 
                 <button type="submit" :disabled="saving || !formComplete" class="btn-primary mt-4">
+                    <BoIcon name="check" :size="16" />
                     {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                 </button>
             </form>
         </UiCard>
+
+        <div class="grid-12 mb-3.5">
+            <KpiCard
+                class="c3" label="Effectif total" icon="students"
+                tip="Élèves inscrits dans l'établissement, affectés à une classe ou non."
+                :value="fm(totalElements)"
+                :foot="`${classOptions.length} classe(s) ouverte(s)`"
+            />
+            <KpiCard
+                class="c3" label="Niveaux déclarés" icon="layers"
+                tip="Niveaux retenus dans les paramètres. Un élève ne peut être inscrit que dans l'un d'eux, et les frais s'y ciblent."
+                :value="String(levelOptions.length)"
+                foot="un élève ne s'inscrit que dans un niveau déclaré"
+            />
+            <KpiCard
+                class="c3" label="Sans classe" icon="alert"
+                tip="Élèves de la page affichée qui ne sont affectés à aucune classe. C'est le reliquat de la rentrée, qu'il reste à répartir."
+                :value="String(withoutClass)"
+                :value-tone="withoutClass ? 'var(--warning)' : undefined"
+                foot="à répartir sur la page affichée"
+            />
+            <KpiCard
+                v-if="overdue" class="c3" label="Familles en retard" icon="cash"
+                tip="Élèves dont au moins une échéance est dépassée. La relance groupée se lance depuis Paiements → Relances."
+                :value="String(overdue.count)"
+                :foot="`${fm(overdue.amount)} F à recouvrer`"
+            />
+            <KpiCard
+                v-else class="c3" label="Classes" icon="layers"
+                :value="String(classOptions.length)"
+                foot="salles ouvertes cette année"
+            />
+        </div>
 
         <p v-if="loadError" class="alert-danger mb-3.5" role="alert">{{ loadError }}</p>
 
         <UiCard :pad="false">
             <div class="tbar">
                 <label class="inp" style="flex: 0 1 260px">
-                    <svg
-                        class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round"
-                    >
-                        <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                    </svg>
+                    <BoIcon name="search" :size="15" />
                     <input
                         v-model="keyword" type="search" class="w-full"
                         placeholder="Nom, prénom ou matricule…" aria-label="Rechercher un élève"
@@ -300,31 +371,31 @@ onMounted(async () => {
                     <thead>
                         <tr>
                             <th>Élève</th>
+                            <th>Matricule</th>
                             <th>Niveau</th>
                             <th>Classe</th>
-                            <th>Naissance</th>
-                            <th>Lieu</th>
+                            <th class="r">Solde dû</th>
+                            <th>Statut</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="loading">
-                            <td colspan="6" class="py-8 text-center" style="color: var(--text-faint)">
-                                Chargement…
-                            </td>
-                        </tr>
+                        <TableSkeleton v-if="loading" :columns="7" />
                         <tr
                             v-for="student in students" v-else :key="student.id"
-                            class="cursor-pointer" @click="opened = student"
+                            class="cl" @click="opened = student"
                         >
                             <td>
                                 <div class="flex items-center gap-2.5">
                                     <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="28" />
                                     <div class="nm min-w-0">
                                         <b>{{ student.lastName }} {{ student.firstName }}</b>
-                                        <span class="nu">{{ student.registrationNumber }}</span>
+                                        <span class="nu">{{ formatDate(student.birthDay) }}</span>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="nu text-[12px]" style="color: var(--text-faint)">
+                                {{ student.registrationNumber }}
                             </td>
                             <td><span class="tag">{{ levelLabel(student.levelOfStudy) }}</span></td>
                             <td>
@@ -335,17 +406,22 @@ onMounted(async () => {
                                     Sans classe
                                 </span>
                             </td>
-                            <td class="nu text-[12.5px]" style="color: var(--text-muted)">
-                                {{ formatDate(student.birthDay) }}
+                            <!-- Le solde en rouge dès qu'une échéance est passée : c'est ce qui
+                                 distingue la famille à relancer de celle qui a un acompte en cours. -->
+                            <td
+                                class="num" :style="Number(student.overdueAmount ?? 0) > 0
+                                    ? 'color: var(--danger)' : 'color: var(--text-faint)'"
+                            >
+                                {{ Number(student.outstandingAmount ?? 0) > 0
+                                    ? `${fm(Number(student.outstandingAmount))} F` : '—' }}
                             </td>
-                            <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                {{ student.placeOfBirth || '—' }}
+                            <td>
+                                <UiPill :tone="paymentState(student).tone">
+                                    {{ paymentState(student).label }}
+                                </UiPill>
                             </td>
                             <td class="text-right">
-                                <svg
-                                    class="w-4 h-4 inline" viewBox="0 0 24 24" fill="none"
-                                    stroke="var(--text-faint)" stroke-width="2" stroke-linecap="round"
-                                ><path d="M9 6l6 6-6 6" /></svg>
+                                <BoIcon name="chevron-right" :size="16" />
                             </td>
                         </tr>
                     </tbody>

@@ -95,13 +95,13 @@ onMounted(load);
                 <div class="kpi-label">Recettes attendues</div>
                 <div class="kpi-value text-[22px]">
                     <template v-if="activity.price">
-                        {{ Math.round(Number(activity.expectedRevenue ?? 0)).toLocaleString('fr-FR') }}<small>F</small>
+                        {{ fm(Number(activity.expectedRevenue ?? 0)) }}<small>F</small>
                     </template>
                     <template v-else>—</template>
                 </div>
                 <p class="text-[11.5px] mt-2" style="color: var(--text-faint)">
                     <template v-if="activity.price">
-                        {{ Math.round(Number(activity.price)).toLocaleString('fr-FR') }} F par élève
+                        {{ fm(Number(activity.price)) }} F par élève
                     </template>
                     <template v-else>activité gratuite</template>
                 </p>
@@ -144,7 +144,9 @@ onMounted(load);
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
         <p class="sec">Inscrits</p>
-        <p v-if="loading" class="text-[12.5px]" style="color: var(--text-faint)">Chargement…</p>
+        <div v-if="loading" class="flex flex-col gap-2.5">
+            <i v-for="n in 4" :key="n" class="sk h-6" />
+        </div>
         <div
             v-else-if="enrolled.length" class="rounded-xl overflow-hidden mb-5"
             style="border: 1px solid var(--border)"

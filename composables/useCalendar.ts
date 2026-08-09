@@ -1,6 +1,6 @@
 import type { SchoolClass } from '~/composables/useClasses';
 
-export type CalendarEntryKind = 'SCHOOL_LIFE' | 'EXAM' | 'FEE_DUE';
+export type CalendarEntryKind = 'SCHOOL_LIFE' | 'EXAM' | 'FEE_DUE' | 'ACADEMIC_PERIOD';
 export type SchoolEventKind = 'SCHOOL_LIFE' | 'EXAM';
 
 export type CalendarEntry = {
@@ -43,6 +43,9 @@ export const ENTRY_KINDS: { value: CalendarEntryKind; label: string; tone: strin
     { value: 'SCHOOL_LIFE', label: 'Vie scolaire', tone: 'var(--brand-600)' },
     { value: 'FEE_DUE', label: 'Échéance', tone: 'var(--warning-solid)' },
     { value: 'EXAM', label: 'Examen', tone: 'var(--danger-solid)' },
+    // Déduits de l'année scolaire déclarée aux paramètres : début et fin de chaque période. Ce
+    // sont des repères, pas des événements — on ne peut ni les ouvrir ni les modifier ici.
+    { value: 'ACADEMIC_PERIOD', label: 'Période', tone: 'var(--text-muted)' },
 ];
 
 export const MONTHS = [
@@ -108,7 +111,7 @@ export function monthCells(year: number, month: number): MonthCell[] {
  */
 export function compactAmount(amount: number) {
     const value = Math.round(Number(amount));
-    return value >= 1000 ? `${Math.round(value / 1000)}k` : `${value} F`;
+    return value >= 1000 ? `${Math.round(value / 1000)}k` : `${fm(value)} F`;
 }
 
 /** Part réglée d'une échéance. Nulle quand rien n'est attendu — distinct de zéro pour cent. */

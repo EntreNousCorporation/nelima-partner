@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
-    ACTIVITY_KINDS, ACTIVITY_STATUSES, WEEK_DAYS, activityFillingRate, kindLabel, slotLabel, statusLabel,
+    ACTIVITY_KINDS, ACTIVITY_STATUSES, WEEK_DAYS, activityFillingRate, dayLabel, kindIcon,
+    kindLabel, kindTone, statusLabel,
     type Activity, type ActivityEnrollment, type ActivityKind, type ActivityStatus,
 } from '~/composables/useActivities';
 import { CYCLES, cycleLabel, type EducationCycle } from '~/composables/useStudents';
@@ -35,6 +36,17 @@ const selected = ref<Activity | null>(null);
 const opened = ref<Activity | null>(null);
 
 const canWrite = computed(() => can('activity:write'));
+
+/**
+ * Nature de l'activité d'une inscription.
+ *
+ * La ligne d'inscription ne porte que le nom de l'activité ; la pastille de couleur se retrouve
+ * donc par le catalogue déjà chargé. Faute de correspondance — une activité retirée depuis —, la
+ * teinte neutre s'applique plutôt qu'une couleur prise au hasard.
+ */
+function activityKindOf(line: ActivityEnrollment) {
+    return rows.value.find((activity) => activity.id === line.activityId)?.kind ?? null;
+}
 
 const showForm = ref(false);
 const editing = ref<Activity | null>(null);
@@ -279,8 +291,11 @@ onMounted(async () => {
                 : 'Sport, art et culture, langues, soutien scolaire'"
         >
             <template #actions>
+                <NuxtLink to="/app/calendrier" class="btn-secondary">
+                    <BoIcon name="calendar" :size="16" />Planning
+                </NuxtLink>
                 <button v-if="canWrite" class="btn-primary" @click="openCreate">
-                    Nouvelle activité
+                    <BoIcon name="plus" :size="16" />Nouvelle activité
                 </button>
             </template>
         </PageHead>
@@ -379,7 +394,8 @@ onMounted(async () => {
                 <div class="flex gap-2 mt-4">
                     <button
                         type="submit" class="btn-primary" :disabled="saving || !form.name || !form.capacity"
-                    >{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
+                    >
+                        <BoIcon name="check" :size="16" />{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
                     <button type="button" class="btn-secondary" @click="showForm = false">
                         Annuler
                     </button>
@@ -387,69 +403,74 @@ onMounted(async () => {
             </form>
         </UiCard>
 
+        <!-- Les brouillons ne sont pas visibles des familles : le dire évite de croire qu'une
+             activité préparée est déjà proposée. -->
+        <nav class="sub-nav">
+            <button
+                :aria-current="tab === 'catalog' ? 'page' : undefined" @click="tab = 'catalog'"
+            >Catalogue</button>
+            <button
+                :aria-current="tab === 'enrollments' ? 'page' : undefined"
+                @click="tab = 'enrollments'"
+            >Inscriptions</button>
+        </nav>
+
         <div class="grid-12 mb-3.5">
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Activités proposées</span>
-                <span class="kpi-value">{{ openCount }}<small>ouvertes</small></span>
-                <span class="kpi-foot">
-                    {{ draftCount }} en brouillon
-                    <!-- Les brouillons ne sont pas visibles des familles : le dire évite de croire
-                         qu'une activité préparée est déjà proposée. -->
-                </span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Élèves inscrits</span>
-                <span class="kpi-value">{{ totalEnrolled }}<small>inscrits</small></span>
-                <span class="kpi-foot">
-                    <template v-if="totalWaitlisted">{{ totalWaitlisted }} en liste d'attente</template>
-                    <template v-else>aucune attente</template>
-                </span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Taux de remplissage</span>
-                <span class="kpi-value">
-                    {{ totalSeats ? Math.round(totalEnrolled / totalSeats * 100) : 0 }}<small>%</small>
-                </span>
-                <span class="kpi-foot">{{ totalEnrolled }} places sur {{ totalSeats }}</span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Recettes attendues</span>
-                <span class="kpi-value">
-                    {{ Math.round(expectedRevenue).toLocaleString('fr-FR') }}<small>FCFA</small>
-                </span>
-                <span class="kpi-foot">sur les inscriptions en cours</span>
-            </div>
+            <KpiCard
+                class="c3" label="Activités proposées" icon="sparkles"
+                tip="Activités ouvertes aux inscriptions. Les brouillons ne sont pas visibles des familles."
+                :value="String(openCount)" unit="ouvertes"
+                :foot="`${draftCount} en brouillon`"
+            />
+            <KpiCard
+                class="c3" label="Élèves inscrits" icon="students"
+                tip="Inscriptions confirmées, hors liste d'attente. Une place en attente ne crée aucune dette."
+                :value="String(totalEnrolled)" unit="inscrits"
+                :foot="totalWaitlisted ? `${totalWaitlisted} en liste d'attente` : 'aucune attente'"
+            />
+            <KpiCard
+                class="c3" label="Taux de remplissage" icon="percent"
+                tip="Places prises rapportées aux capacités déclarées, toutes activités confondues."
+                :value="String(totalSeats ? Math.round(totalEnrolled / totalSeats * 100) : 0)" unit="%"
+                :foot="`${totalEnrolled} places sur ${totalSeats}`"
+            >
+                <template #chart>
+                    <StatDonut
+                        v-if="totalSeats" :percent="totalEnrolled / totalSeats * 100"
+                        tone="var(--brand-600)"
+                    />
+                </template>
+            </KpiCard>
+            <KpiCard
+                class="c3" label="Recettes attendues" icon="cash"
+                tip="Tarif multiplié par le nombre d'inscrits, sur les seules inscriptions confirmées."
+                :value="fm(expectedRevenue)" unit="FCFA"
+                foot="sur les inscriptions en cours"
+            />
         </div>
 
-        <UiCard :pad="false">
-            <div class="tbar">
-                <div class="flex items-center gap-2">
-                    <button class="chip" :aria-pressed="tab === 'catalog'" @click="tab = 'catalog'">
-                        Catalogue
-                    </button>
-                    <button
-                        class="chip" :aria-pressed="tab === 'enrollments'"
-                        @click="tab = 'enrollments'"
-                    >Inscriptions</button>
-                </div>
-            </div>
 
-            <template v-if="tab === 'catalog'">
+        <!-- ============ Catalogue ============ -->
+        <!-- Deux colonnes, comme la maquette : le catalogue à gauche, l'affectation de l'activité
+             sélectionnée à droite. Empilées, on perdait le lien entre la ligne cliquée et le
+             panneau qui la concerne — il fallait défiler pour voir ce qu'on venait de choisir. -->
+        <div v-if="tab === 'catalog'" class="grid-12">
+            <UiCard
+                class="c8" :pad="false"
+                title="Catalogue des activités"
+                sub="Cliquez sur une activité pour choisir les classes conviées"
+                tip="Une activité peut être ouverte à tout l'établissement ou réservée à certaines classes. Un double-clic ouvre sa fiche complète."
+            >
                 <div class="tbar">
                     <label class="inp" style="flex: 0 1 240px">
-                        <svg
-                            class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        >
-                            <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                        </svg>
+                        <BoIcon name="search" :size="15" />
                         <input
                             v-model="keyword" type="search" class="w-full"
                             placeholder="Activité ou encadrant…" aria-label="Rechercher une activité"
                         />
                     </label>
 
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-1.5 flex-wrap">
                         <button class="chip" :aria-pressed="!selectedKind" @click="selectedKind = ''">
                             Toutes
                         </button>
@@ -469,43 +490,62 @@ onMounted(async () => {
                                 <th>Créneau</th>
                                 <th>Encadrant</th>
                                 <th>Classes</th>
-                                <th style="width: 170px">Places</th>
-                                <th class="text-right">Tarif</th>
-                                <th>État</th>
-                                <th></th>
+                                <th style="width: 150px">Places</th>
+                                <th class="r">Tarif</th>
+                                <th>Statut</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="loading">
-                                <td colspan="8" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
+                            <TableSkeleton v-if="loading" :columns="7" />
                             <tr
-                                v-for="row in filtered" v-else :key="row.id" class="cursor-pointer"
-                                :style="selected?.id === row.id ? 'background: var(--brand-50)' : ''"
+                                v-for="row in filtered" v-else :key="row.id" class="cl"
+                                :aria-selected="selected?.id === row.id"
                                 @click="selectActivity(row)" @dblclick="opened = row"
                             >
                                 <td>
-                                    <b class="text-sm font-extrabold" style="color: var(--navy)">
-                                        {{ row.name }}
-                                    </b>
-                                    <div class="text-[11.5px]" style="color: var(--text-faint)">
-                                        {{ kindLabel(row.kind) }}{{ row.place ? ` · ${row.place}` : '' }}
+                                    <div class="flex items-center gap-2.5">
+                                        <!-- La pastille porte la nature : sur dix lignes, on repère
+                                             le sport avant d'avoir lu le libellé. -->
+                                        <span
+                                            class="w-8 h-8 rounded-[10px] grid place-items-center shrink-0"
+                                            :style="kindTone(row.kind)"
+                                        ><BoIcon :name="kindIcon(row.kind)" :size="17" /></span>
+                                        <div class="min-w-0">
+                                            <b class="block text-[13px] font-bold leading-tight" style="color: var(--navy)">
+                                                {{ row.name }}
+                                            </b>
+                                            <span class="text-[11.5px]" style="color: var(--text-faint)">
+                                                {{ kindLabel(row.kind) }}{{ row.place ? ` · ${row.place}` : '' }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </td>
-                                <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                    {{ slotLabel(row) }}
+                                <td>
+                                    <b class="block text-[12.5px] font-semibold" style="color: var(--text)">
+                                        {{ dayLabel(row.dayOfWeek) }}
+                                    </b>
+                                    <span
+                                        v-if="row.startTime" class="nu text-[11.5px]"
+                                        style="color: var(--text-faint)"
+                                    >{{ row.startTime.slice(0, 5) }} – {{ (row.endTime ?? '').slice(0, 5) }}</span>
                                 </td>
-                                <td class="text-[12.5px] font-semibold" style="color: var(--text)">
+                                <td class="text-[12.5px]" style="color: var(--text-muted)">
                                     {{ row.coachName ?? 'à désigner' }}
                                 </td>
-                                <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                    <span v-if="row.openToAll" class="tag">Toutes</span>
-                                    <template v-else-if="row.eligibleClasses.length">
-                                        {{ row.eligibleClasses.map((c) => c.name).join(', ') }}
-                                    </template>
-                                    <span v-else style="color: var(--text-faint)">Aucune</span>
+                                <td>
+                                    <UiPill v-if="row.openToAll" tone="info">
+                                        <BoIcon name="check" :size="12" :stroke-width="2.2" />Toutes
+                                    </UiPill>
+                                    <div v-else-if="row.eligibleClasses.length" class="flex gap-1 flex-wrap">
+                                        <span
+                                            v-for="schoolClass in row.eligibleClasses.slice(0, 2)"
+                                            :key="schoolClass.id" class="tag"
+                                        >{{ schoolClass.name }}</span>
+                                        <span v-if="row.eligibleClasses.length > 2" class="tag">
+                                            +{{ row.eligibleClasses.length - 2 }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-[12px]" style="color: var(--text-faint)">Aucune</span>
                                 </td>
                                 <td>
                                     <div class="flex items-center gap-2.5">
@@ -513,17 +553,22 @@ onMounted(async () => {
                                             <i
                                                 class="block h-full rounded-full"
                                                 :style="{
-                                                    width: `${Math.min(100, activityFillingRate(row))}%`,
+                                                    width: `${Math.max(2, Math.min(100, activityFillingRate(row)))}%`,
                                                     background: row.enrolledCount >= row.capacity
                                                         ? 'var(--danger-solid)'
                                                         : activityFillingRate(row) > 85
-                                                            ? 'var(--warning-solid)' : 'var(--brand-600)',
+                                                            ? 'var(--warning-solid)' : 'var(--success-solid)',
                                                 }"
                                             />
                                         </div>
-                                        <span class="nu text-[12px] font-bold" style="min-width: 44px; text-align: right">
-                                            {{ row.enrolledCount }}/{{ row.capacity }}
-                                        </span>
+                                        <span
+                                            class="nu text-[12px] font-bold text-right"
+                                            :style="{
+                                                minWidth: '42px',
+                                                color: row.enrolledCount >= row.capacity
+                                                    ? 'var(--danger)' : 'var(--text-muted)',
+                                            }"
+                                        >{{ row.enrolledCount }}/{{ row.capacity }}</span>
                                     </div>
                                     <div
                                         v-if="row.waitlistedCount" class="text-[11px] mt-1"
@@ -531,23 +576,12 @@ onMounted(async () => {
                                     >{{ row.waitlistedCount }} en attente</div>
                                 </td>
                                 <td class="num">
-                                    {{ row.price
-                                        ? `${Math.round(Number(row.price)).toLocaleString('fr-FR')} F`
-                                        : 'gratuite' }}
+                                    {{ row.price ? `${fm(Number(row.price))} F` : 'gratuite' }}
                                 </td>
                                 <td>
-                                    <span
-                                        class="tag"
-                                        :style="row.status === 'ACTIVE' ? '' : 'color: var(--text-faint)'"
-                                    >{{ statusLabel(row.status) }}</span>
-                                </td>
-                                <td class="text-right whitespace-nowrap">
-                                    <button v-if="canWrite" class="btn-ghost btn-sm" @click.stop="openEdit(row)">
-                                        Modifier
-                                    </button>
-                                    <button v-if="canWrite" class="btn-ghost btn-sm" @click.stop="destroy(row)">
-                                        Retirer
-                                    </button>
+                                    <UiPill :tone="row.status === 'ACTIVE' ? 'ok' : 'mute'">
+                                        {{ statusLabel(row.status) }}
+                                    </UiPill>
                                 </td>
                             </tr>
                         </tbody>
@@ -564,157 +598,85 @@ onMounted(async () => {
                     title="Aucune activité"
                     text="Créez vos activités extra-scolaires, puis désignez les classes conviées ou ouvrez-les à tout l'établissement."
                 />
-            </template>
 
-            <template v-else>
-                <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Élève</th>
-                                <th>Classe</th>
-                                <th>Activité</th>
-                                <th>Demandée le</th>
-                                <th>Origine</th>
-                                <th class="text-right">Montant</th>
-                                <th>État</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="linesLoading">
-                                <td colspan="8" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
-                            <tr v-for="line in lines" v-else :key="line.id">
-                                <td>
-                                    <div class="flex items-center gap-2.5">
-                                        <AvatarBadge
-                                            :name="`${line.studentLastName} ${line.studentFirstName}`"
-                                            :size="34"
-                                        />
-                                        <div>
-                                            <b class="text-sm font-extrabold" style="color: var(--navy)">
-                                                {{ line.studentLastName }} {{ line.studentFirstName }}
-                                            </b>
-                                            <div class="nu text-[11.5px]" style="color: var(--text-faint)">
-                                                {{ line.studentRegistrationNumber ?? '—' }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td><span class="tag">{{ line.className ?? '—' }}</span></td>
-                                <td class="text-[12.5px] font-semibold" style="color: var(--text)">
-                                    {{ line.activityName }}
-                                </td>
-                                <td class="nu text-[12px]" style="color: var(--text-faint)">
-                                    {{ new Date(line.requestedAt).toLocaleDateString('fr-FR') }}
-                                </td>
-                                <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                    {{ line.source === 'PARENT' ? 'Famille' : 'Secrétariat' }}
-                                </td>
-                                <td class="num">
-                                    {{ line.amountDue
-                                        ? `${Math.round(Number(line.amountDue)).toLocaleString('fr-FR')} F`
-                                        : '—' }}
-                                </td>
-                                <td
-                                    class="text-[12.5px] font-semibold"
-                                    :style="line.status === 'ENROLLED' ? 'color: var(--text)'
-                                        : line.status === 'WAITLISTED' ? 'color: var(--warning)'
-                                            : 'color: var(--text-faint)'"
-                                >
-                                    {{ line.status === 'ENROLLED' ? 'Inscrit'
-                                        : line.status === 'WAITLISTED' ? 'En attente' : 'Annulée' }}
-                                </td>
-                                <td class="text-right whitespace-nowrap">
-                                    <!-- Une inscription déjà encaissée ne s'annule pas : le bouton
-                                         disparaît plutôt que d'échouer une fois cliqué. -->
-                                    <button
-                                        v-if="canWrite && line.status !== 'CANCELLED' && !line.partiallyPaid"
-                                        class="btn-ghost btn-sm" @click="cancelEnrollment(line)"
-                                    >Annuler</button>
-                                    <span
-                                        v-else-if="line.partiallyPaid" class="text-[12px]"
-                                        style="color: var(--text-faint)"
-                                    >encaissée</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <template #footer>
+                    <span class="text-[12px]" style="color: var(--text-faint)">
+                        <b class="nu" style="color: var(--navy)">{{ filtered.length }}</b>
+                        activité(s)
+                    </span>
+                    <span class="text-[12px]" style="color: var(--text-faint)">
+                        Double-cliquez sur une activité pour ouvrir sa fiche
+                    </span>
+                </template>
+            </UiCard>
+
+            <!-- ============ Affectation aux classes ============ -->
+            <UiCard
+                class="c4" :pad="false"
+                title="Affectation aux classes"
+                :sub="selected ? selected.name : 'Sélectionnez une activité'"
+            >
+                <template v-if="selected && canWrite" #action>
+                    <button class="btn-primary btn-sm" :disabled="assignSaving" @click="saveAssignment">
+                        <BoIcon name="check" :size="15" />
+                        {{ assignSaving ? 'Enregistrement…' : 'Enregistrer' }}
+                    </button>
+                </template>
 
                 <EmptyState
-                    v-if="!linesLoading && !lines.length"
-                    title="Aucune inscription"
-                    text="Les inscriptions du secrétariat et les demandes des familles apparaissent ici."
+                    v-if="!selected"
+                    title="Aucune activité sélectionnée"
+                    text="Cliquez sur une activité du catalogue pour choisir les classes qui peuvent y participer."
                 />
-            </template>
 
-            <template #footer>
-                <span class="text-[12px]" style="color: var(--text-faint)">
-                    <b class="nu" style="color: var(--navy)">
-                        {{ tab === 'catalog' ? filtered.length : lines.length }}
-                    </b>
-                    {{ tab === 'catalog' ? 'activité(s)' : 'inscription(s)' }}
-                </span>
-                <span
-                    v-if="tab === 'catalog'" class="text-[12px]" style="color: var(--text-faint)"
-                >Double-cliquez sur une activité pour ouvrir sa fiche</span>
-            </template>
-        </UiCard>
-
-        <UiCard
-            v-if="tab === 'catalog' && canWrite" class="mt-3.5"
-            title="Affectation aux classes"
-            :sub="selected ? selected.name : 'Sélectionnez une activité du catalogue'"
-        >
-            <template v-if="selected">
-                <label
-                    class="flex items-center gap-3 p-3 rounded-xl mb-3.5 cursor-pointer"
-                    style="border: 1px solid var(--border)"
-                    :style="assignAll ? 'background: var(--brand-50)' : ''"
-                >
-                    <input v-model="assignAll" type="checkbox" />
-                    <span class="flex-1">
-                        <b class="text-[13px]" style="color: var(--navy)">Toutes les classes</b>
-                        <span class="block text-[11.5px]" style="color: var(--text-faint)">
-                            L'activité est proposée à l'ensemble de l'établissement, y compris aux
-                            classes créées par la suite
-                        </span>
-                    </span>
-                </label>
-
-                <div :style="assignAll ? 'opacity: .4; pointer-events: none' : ''">
-                    <div v-for="group in classesByCycle" :key="group.key" class="mb-3.5">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="sec" style="margin: 0">{{ group.label }}</span>
-                            <button
-                                class="text-[11.5px] font-bold" style="color: var(--brand-600)"
-                                @click="toggleCycle(group.items)"
-                            >Tout le cycle</button>
+                <template v-else>
+                    <div
+                        class="flex items-center gap-3 px-4 py-3"
+                        style="border-bottom: 1px solid var(--border)"
+                        :style="assignAll ? 'background: var(--brand-50)' : ''"
+                    >
+                        <div class="flex-1 min-w-0">
+                            <b class="block text-[13px]" style="color: var(--navy)">Toutes les classes</b>
+                            <span class="text-[11.5px]" style="color: var(--text-faint)">
+                                L'activité est proposée à l'ensemble de l'établissement, y compris
+                                aux classes créées par la suite
+                            </span>
                         </div>
-                        <div class="flex gap-1.5 flex-wrap">
-                            <button
-                                v-for="schoolClass in group.items" :key="schoolClass.id" class="chip"
-                                :aria-pressed="assignIds.includes(schoolClass.id)"
-                                @click="toggleClass(schoolClass.id)"
-                            >{{ schoolClass.name }}</button>
-                        </div>
+                        <UiSwitch v-model="assignAll" :disabled="!canWrite" />
                     </div>
-                    <p v-if="!classesByCycle.length" class="text-[12.5px]" style="color: var(--text-faint)">
-                        Aucune classe déclarée : ouvrez l'activité à tout l'établissement, ou créez
-                        vos classes d'abord.
-                    </p>
-                </div>
 
-                <div class="flex items-center gap-3 mt-4">
-                    <button class="btn-primary" :disabled="assignSaving" @click="saveAssignment">
-                        {{ assignSaving ? 'Enregistrement…' : 'Enregistrer l’affectation' }}
-                    </button>
+                    <div
+                        class="p-4 flex flex-col gap-4"
+                        :style="assignAll ? 'opacity: .4; pointer-events: none' : ''"
+                    >
+                        <div v-for="group in classesByCycle" :key="group.key">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="sec" style="margin: 0">{{ group.label }}</span>
+                                <button
+                                    class="text-[11.5px] font-bold" style="color: var(--brand-600)"
+                                    @click="toggleCycle(group.items)"
+                                >Tout le niveau</button>
+                            </div>
+                            <div class="flex gap-1.5 flex-wrap">
+                                <button
+                                    v-for="schoolClass in group.items" :key="schoolClass.id" class="chip"
+                                    :aria-pressed="assignIds.includes(schoolClass.id)"
+                                    @click="toggleClass(schoolClass.id)"
+                                >{{ schoolClass.name }}</button>
+                            </div>
+                        </div>
+
+                        <p v-if="!classesByCycle.length" class="text-[12.5px]" style="color: var(--text-faint)">
+                            Aucune classe déclarée : ouvrez l'activité à tout l'établissement, ou
+                            créez vos classes d'abord.
+                        </p>
+                    </div>
+
+                </template>
+
+                <template v-if="selected" #footer>
                     <span class="text-[12px]" style="color: var(--text-faint)">
-                        <template v-if="assignAll">tout l'établissement est convié</template>
+                        <template v-if="assignAll">Tout l'établissement est convié</template>
                         <template v-else>
                             <b class="nu" style="color: var(--navy)">{{ assignIds.length }}</b>
                             classe(s) ·
@@ -722,13 +684,100 @@ onMounted(async () => {
                             élève(s) éligibles
                         </template>
                     </span>
-                </div>
-            </template>
+                </template>
+            </UiCard>
+        </div>
+
+        <!-- ============ Inscriptions ============ -->
+        <UiCard
+            v-else :pad="false"
+            title="Inscriptions"
+            sub="Saisies par le secrétariat et demandes reçues des familles"
+        >
+            <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Élève</th>
+                            <th>Classe</th>
+                            <th>Activité</th>
+                            <th>Demandée le</th>
+                            <th>Origine</th>
+                            <th class="r">Montant</th>
+                            <th>État</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <TableSkeleton v-if="linesLoading" :columns="8" />
+                        <tr v-for="line in lines" v-else :key="line.id">
+                            <td>
+                                <div class="flex items-center gap-2.5">
+                                    <AvatarBadge
+                                        :name="`${line.studentLastName} ${line.studentFirstName}`"
+                                        :size="30"
+                                    />
+                                    <div class="nm min-w-0">
+                                        <b>{{ line.studentLastName }} {{ line.studentFirstName }}</b>
+                                        <span class="nu">{{ line.studentRegistrationNumber ?? '—' }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="tag">{{ line.className ?? '—' }}</span></td>
+                            <td>
+                                <span class="inline-flex items-center gap-2 text-[12.5px] font-semibold" style="color: var(--navy)">
+                                    <i
+                                        class="w-2 h-2 rounded-sm shrink-0"
+                                        :style="{ background: kindTone(activityKindOf(line)).color }"
+                                    />{{ line.activityName }}
+                                </span>
+                            </td>
+                            <td class="nu text-[12px]" style="color: var(--text-faint)">
+                                {{ new Date(line.requestedAt).toLocaleDateString('fr-FR') }}
+                            </td>
+                            <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                {{ line.source === 'PARENT' ? 'Famille' : 'Secrétariat' }}
+                            </td>
+                            <td class="num">
+                                {{ line.amountDue ? `${fm(Number(line.amountDue))} F` : '—' }}
+                            </td>
+                            <td>
+                                <UiPill
+                                    :tone="line.status === 'ENROLLED' ? 'ok'
+                                        : line.status === 'WAITLISTED' ? 'warn' : 'mute'"
+                                >
+                                    {{ line.status === 'ENROLLED' ? 'Inscrit'
+                                        : line.status === 'WAITLISTED' ? 'En attente' : 'Annulée' }}
+                                </UiPill>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <!-- Une inscription déjà encaissée ne s'annule pas : le bouton
+                                     disparaît plutôt que d'échouer une fois cliqué. -->
+                                <button
+                                    v-if="canWrite && line.status !== 'CANCELLED' && !line.partiallyPaid"
+                                    class="btn-ghost btn-sm" @click="cancelEnrollment(line)"
+                                >Annuler</button>
+                                <span
+                                    v-else-if="line.partiallyPaid" class="text-[12px]"
+                                    style="color: var(--text-faint)"
+                                >encaissée</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <EmptyState
-                v-else
-                title="Aucune activité sélectionnée"
-                text="Cliquez sur une activité du catalogue pour choisir les classes qui peuvent y participer."
+                v-if="!linesLoading && !lines.length"
+                title="Aucune inscription"
+                text="Les inscriptions du secrétariat et les demandes des familles apparaissent ici."
             />
+
+            <template #footer>
+                <span class="text-[12px]" style="color: var(--text-faint)">
+                    <b class="nu" style="color: var(--navy)">{{ lines.length }}</b> inscription(s)
+                </span>
+            </template>
         </UiCard>
 
         <ActivityDrawer

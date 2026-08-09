@@ -66,12 +66,7 @@ function go(path: string) {
             class="flex items-center gap-2.5 h-[34px] px-3 rounded-lg"
             style="background: rgba(255,255,255,.09); color: #9FBDE9"
         >
-            <svg
-                class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round"
-            >
-                <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-            </svg>
+            <BoIcon name="search" :size="15" />
             <input
                 v-model="term" type="search"
                 class="flex-1 min-w-0 bg-transparent border-0 outline-none text-[13px] text-white"

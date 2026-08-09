@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatAmount, formatDate, channelLabel, type Installment, type Receipt } from '~/composables/useBilling';
-import { levelLabel, type Student } from '~/composables/useStudents';
+import { levelLabel, type Student, type Guardian } from '~/composables/useStudents';
 
 /**
  * Fiche élève.
@@ -28,6 +28,23 @@ const today = new Date().toISOString().slice(0, 10);
 function isLate(installment: Installment) {
     return installment.status === 'PENDING'
         && Boolean(installment.dueDate) && installment.dueDate! < today;
+}
+
+/** Nom affichable d'un tuteur : prénom + nom, à défaut l'identifiant de connexion. */
+function guardianName(g: Guardian): string {
+    const full = `${g.firstName ?? ''} ${g.lastName ?? ''}`.trim();
+    return full || g.username || '—';
+}
+
+/** Coordonnées lisibles : téléphone principal d'abord, puis e-mail, à défaut l'identifiant. */
+function guardianContact(g: Guardian): string {
+    const contacts = g.contacts ?? [];
+    const phone = contacts.find((c) => c.type === 'PHONE' && c.isPrimary)
+        ?? contacts.find((c) => c.type === 'PHONE');
+    const email = contacts.find((c) => c.type === 'EMAIL' && c.isPrimary)
+        ?? contacts.find((c) => c.type === 'EMAIL');
+    const parts = [phone?.value, email?.value].filter(Boolean);
+    return parts.length ? parts.join(' · ') : (g.username ?? '—');
 }
 
 onMounted(async () => {
@@ -94,8 +111,35 @@ onMounted(async () => {
             <dt>Lieu</dt><dd>{{ student.placeOfBirth || '—' }}</dd>
         </dl>
 
+        <p class="sec">Parents / Tuteurs</p>
+        <div
+            v-if="student.parentUsers?.length"
+            class="rounded-xl overflow-hidden mb-5" style="border: 1px solid var(--border)"
+        >
+            <div
+                v-for="parent in student.parentUsers" :key="parent.id"
+                class="flex items-center gap-3 px-3 py-2.5"
+                style="border-bottom: 1px solid var(--border)"
+            >
+                <AvatarBadge :name="guardianName(parent)" :size="28" />
+                <div class="flex-1 min-w-0">
+                    <b class="block text-[12.5px]" style="color: var(--navy)">
+                        {{ guardianName(parent) }}
+                    </b>
+                    <div class="nu text-[11px]" style="color: var(--text-faint)">
+                        {{ guardianContact(parent) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p v-else class="text-[12.5px] mb-5" style="color: var(--text-faint)">
+            Aucun parent rattaché à cet élève pour le moment.
+        </p>
+
         <p class="sec">Échéancier</p>
-        <p v-if="loading" class="text-[12.5px] mb-5" style="color: var(--text-faint)">Chargement…</p>
+        <div v-if="loading" class="flex flex-col gap-2.5 mb-5">
+            <i v-for="n in 4" :key="n" class="sk h-6" />
+        </div>
         <div v-else-if="dues.length" class="rounded-xl overflow-hidden mb-5" style="border: 1px solid var(--border)">
             <div
                 v-for="installment in dues" :key="installment.id"
@@ -137,7 +181,7 @@ onMounted(async () => {
                 <a
                     :href="`/api/v1/receipts/${receipt.id}/pdf`"
                     :download="`recu-${receipt.number}.pdf`" class="btn-secondary btn-sm"
-                >PDF</a>
+                ><BoIcon name="download" :size="15" />PDF</a>
             </div>
         </div>
         <p v-else-if="!loading" class="text-[12.5px]" style="color: var(--text-faint)">
@@ -146,6 +190,7 @@ onMounted(async () => {
 
         <template #footer>
             <NuxtLink to="/app/paiements/guichet" class="btn-primary flex-1">
+                <BoIcon name="cash" :size="16" />
                 Encaisser au guichet
             </NuxtLink>
             <NuxtLink :to="`/app/paiements/recus?q=${student.registrationNumber}`" class="btn-secondary">

@@ -192,7 +192,9 @@ onMounted(loadMembers);
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
         <p class="sec">Élèves de la classe</p>
-        <p v-if="loading" class="text-[12.5px]" style="color: var(--text-faint)">Chargement…</p>
+        <div v-if="loading" class="flex flex-col gap-2.5">
+            <i v-for="n in 4" :key="n" class="sk h-6" />
+        </div>
         <div v-else-if="members.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
             <div
                 v-for="student in members" :key="student.id"

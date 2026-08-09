@@ -315,7 +315,7 @@ onMounted(async () => {
         >
             <template #actions>
                 <button v-if="canWrite" class="btn-primary" @click="openCreate">
-                    Nouveau membre
+                    <BoIcon name="plus" :size="16" />Nouveau membre
                 </button>
             </template>
         </PageHead>
@@ -405,7 +405,8 @@ onMounted(async () => {
                     <button
                         type="submit" class="btn-primary"
                         :disabled="saving || !form.lastName || !form.firstName"
-                    >{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
+                    >
+                        <BoIcon name="check" :size="16" />{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
                     <button type="button" class="btn-secondary" @click="showForm = false">
                         Annuler
                     </button>
@@ -413,77 +414,64 @@ onMounted(async () => {
             </form>
         </UiCard>
 
+        <nav class="sub-nav">
+            <button
+                :aria-current="tab === 'directory' ? 'page' : undefined" @click="tab = 'directory'"
+            >Annuaire</button>
+            <button
+                :aria-current="tab === 'assignments' ? 'page' : undefined"
+                @click="tab = 'assignments'"
+            >Affectations</button>
+            <button
+                :aria-current="tab === 'attendance' ? 'page' : undefined"
+                @click="tab = 'attendance'"
+            >Présences</button>
+            <button
+                v-if="canReadSalary" :aria-current="tab === 'contracts' ? 'page' : undefined"
+                @click="tab = 'contracts'"
+            >Contrats</button>
+            <button
+                v-if="canGrantAccess" :aria-current="tab === 'access' ? 'page' : undefined"
+                @click="tab = 'access'"
+            >Accès au portail</button>
+        </nav>
+
         <div class="grid-12 mb-3.5">
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Effectif du personnel</span>
-                <span class="kpi-value">{{ rows.length }}<small>membres</small></span>
-                <span class="kpi-foot">
-                    {{ teachers.length }} enseignant{{ teachers.length > 1 ? 's' : '' }} ·
-                    {{ rows.length - teachers.length }} autre{{ rows.length - teachers.length > 1 ? 's' : '' }}
-                </span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Pointés aujourd'hui</span>
-                <span class="kpi-value">{{ presentToday }}<small>/ {{ rows.length }}</small></span>
-                <span class="kpi-foot">
-                    <template v-if="pointedToday">
-                        {{ pointedToday - presentToday }} absence(s) relevée(s)
-                    </template>
-                    <template v-else>aucun pointage enregistré</template>
-                </span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Heures enseignées / sem.</span>
-                <span class="kpi-value">{{ weeklyHours }}<small>h</small></span>
-                <span class="kpi-foot">
-                    {{ teachers.length ? Math.round(weeklyHours / teachers.length) : 0 }} h en moyenne
-                </span>
-            </div>
-            <div v-if="canReadSalary" class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Masse salariale / mois</span>
-                <span class="kpi-value">
-                    {{ Math.round(payrollFromDirectory).toLocaleString('fr-FR') }}<small>FCFA</small>
-                </span>
-                <span class="kpi-foot">
-                    {{ rows.filter((r) => r.monthlySalary).length }} salarié(s) renseigné(s)
-                </span>
-            </div>
+            <KpiCard
+                class="c3" label="Effectif du personnel" icon="briefcase"
+                tip="Fiches actives du répertoire. Une fiche désactivée n'est pas supprimée : les reçus qu'elle a émis gardent son nom."
+                :value="String(rows.length)" unit="membres"
+                :foot="`${teachers.length} enseignant(s) · ${rows.length - teachers.length} autre(s)`"
+            />
+            <KpiCard
+                class="c3" label="Pointés aujourd'hui" icon="user-check"
+                tip="Membres pointés présents ce matin. Les retards sont comptés comme présents."
+                :value="String(presentToday)" :unit="`/ ${rows.length}`"
+                :foot="pointedToday
+                    ? `${pointedToday - presentToday} absence(s) relevée(s)`
+                    : 'aucun pointage enregistré'"
+            />
+            <KpiCard
+                class="c3" label="Heures enseignées / sem." icon="clock"
+                tip="Somme des heures hebdomadaires déclarées sur les fiches des enseignants."
+                :value="String(weeklyHours)" unit="h"
+                :foot="`${teachers.length ? Math.round(weeklyHours / teachers.length) : 0} h en moyenne`"
+            />
+            <KpiCard
+                v-if="canReadSalary" class="c3" label="Masse salariale / mois" icon="cash"
+                tip="Somme des salaires bruts renseignés. Les fiches sans salaire n'y figurent pas — le total ne couvre donc pas nécessairement tout l'effectif."
+                :value="fm(payrollFromDirectory)" unit="FCFA"
+                :foot="`${rows.filter((r) => r.monthlySalary).length} salarié(s) renseigné(s)`"
+            />
         </div>
 
+
         <UiCard :pad="false">
-            <div class="tbar">
-                <div class="flex items-center gap-2">
-                    <button class="chip" :aria-pressed="tab === 'directory'" @click="tab = 'directory'">
-                        Annuaire
-                    </button>
-                    <button
-                        class="chip" :aria-pressed="tab === 'assignments'"
-                        @click="tab = 'assignments'"
-                    >Affectations</button>
-                    <button
-                        class="chip" :aria-pressed="tab === 'attendance'"
-                        @click="tab = 'attendance'"
-                    >Présences</button>
-                    <button
-                        v-if="canReadSalary" class="chip" :aria-pressed="tab === 'contracts'"
-                        @click="tab = 'contracts'"
-                    >Contrats</button>
-                    <button
-                        v-if="canGrantAccess" class="chip" :aria-pressed="tab === 'access'"
-                        @click="tab = 'access'"
-                    >Accès au portail</button>
-                </div>
-            </div>
 
             <template v-if="tab === 'directory'">
                 <div class="tbar">
                     <label class="inp" style="flex: 0 1 240px">
-                        <svg
-                            class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        >
-                            <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                        </svg>
+                        <BoIcon name="search" :size="15" />
                         <input
                             v-model="keyword" type="search" class="w-full"
                             placeholder="Nom, poste ou téléphone…" aria-label="Rechercher un membre"
@@ -517,56 +505,72 @@ onMounted(async () => {
                                 <th>Fonction</th>
                                 <th>Classes</th>
                                 <th>Téléphone</th>
-                                <th>Contrat</th>
                                 <th>Aujourd'hui</th>
-                                <th v-if="canReadSalary" class="text-right">Brut mensuel</th>
+                                <th>Accès</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="loading">
-                                <td :colspan="canReadSalary ? 8 : 7" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
+                            <TableSkeleton v-if="loading" :columns="canReadSalary ? 8 : 7" />
                             <tr
-                                v-for="row in filtered" v-else :key="row.id" class="cursor-pointer"
+                                v-for="row in filtered" v-else :key="row.id" class="cl"
                                 @click="opened = row"
                             >
                                 <td>
                                     <div class="flex items-center gap-2.5">
                                         <AvatarBadge :name="fullName(row)" :size="34" />
-                                        <div>
-                                            <b class="text-sm font-extrabold" style="color: var(--navy)">
-                                                {{ fullName(row) }}
-                                            </b>
-                                            <div
-                                                v-if="row.jobTitle" class="text-[11.5px]"
-                                                style="color: var(--text-faint)"
-                                            >{{ row.jobTitle }}</div>
+                                        <div class="nm min-w-0">
+                                            <b>{{ fullName(row) }}</b>
+                                            <span>
+                                                {{ staffRoleLabel(row.role) }}
+                                                <template v-if="seniorityYears(row) !== null">
+                                                    · depuis {{ seniorityYears(row) }} an(s)
+                                                </template>
+                                            </span>
                                         </div>
                                     </div>
                                 </td>
-                                <td><span class="tag">{{ staffRoleLabel(row.role) }}</span></td>
-                                <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                    {{ row.classes.length
-                                        ? row.classes.map((c) => c.name).join(', ')
-                                        : '—' }}
+                                <td class="text-[12.5px] font-semibold" style="color: var(--text)">
+                                    {{ row.jobTitle ?? staffRoleLabel(row.role) }}
+                                </td>
+                                <td>
+                                    <div v-if="row.classes.length" class="flex gap-1 flex-wrap">
+                                        <span
+                                            v-for="schoolClass in row.classes.slice(0, 2)"
+                                            :key="schoolClass.id" class="tag"
+                                        >{{ schoolClass.name }}</span>
+                                        <span v-if="row.classes.length > 2" class="tag">
+                                            +{{ row.classes.length - 2 }}
+                                        </span>
+                                    </div>
+                                    <span v-else style="color: var(--text-faint)">—</span>
                                 </td>
                                 <td class="nu text-[12px]" style="color: var(--text-faint)">
                                     {{ row.phone ?? '—' }}
                                 </td>
-                                <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                    {{ contractLabel(row.contractType) }}
+                                <td>
+                                    <UiPill
+                                        v-if="row.todayStatus"
+                                        :tone="row.todayStatus === 'PRESENT' ? 'ok'
+                                            : row.todayStatus === 'LATE' ? 'warn'
+                                                : row.todayStatus === 'LEAVE' ? 'info' : 'late'"
+                                    >{{ attendanceLabel(row.todayStatus) }}</UiPill>
+                                    <span v-else class="text-[12px]" style="color: var(--text-faint)">
+                                        Non pointé
+                                    </span>
                                 </td>
-                                <td class="text-[12.5px]" :style="row.todayStatus
-                                    ? 'color: var(--text)' : 'color: var(--text-faint)'">
-                                    {{ attendanceLabel(row.todayStatus) }}
-                                </td>
-                                <td v-if="canReadSalary" class="num">
-                                    {{ row.monthlySalary
-                                        ? `${Math.round(Number(row.monthlySalary)).toLocaleString('fr-FR')} F`
-                                        : '—' }}
+                                <!-- L'accès au portail se lit ici et se règle dans l'onglet dédié :
+                                     savoir qui peut entrer fait partie de l'annuaire. -->
+                                <td>
+                                    <span v-if="row.userId && row.accessEnabled" class="tag">
+                                        {{ portalRoleLabel(row.roleCode) }}
+                                    </span>
+                                    <!-- Un accès fermé n'est pas un accès absent : le compte existe
+                                         encore et porte les reçus déjà émis. -->
+                                    <UiPill v-else-if="row.userId" tone="mute">Fermé</UiPill>
+                                    <span v-else class="text-[12px]" style="color: var(--text-faint)">
+                                        Aucun
+                                    </span>
                                 </td>
                                 <td class="text-right whitespace-nowrap">
                                     <span
@@ -575,12 +579,16 @@ onMounted(async () => {
                                     >Désactivée</span>
                                     <button
                                         v-if="canWrite" class="btn-ghost btn-sm"
-                                        @click.stop="openEdit(row)"
-                                    >Modifier</button>
+                                        title="Modifier la fiche" @click.stop="openEdit(row)"
+                                    ><BoIcon name="edit" :size="15" /></button>
                                     <button
                                         v-if="canWrite && row.active" class="btn-ghost btn-sm"
-                                        @click.stop="destroy(row)"
-                                    >Retirer</button>
+                                        title="Désactiver la fiche" @click.stop="destroy(row)"
+                                    ><BoIcon name="ban" :size="15" /></button>
+                                    <BoIcon
+                                        name="chevron-right" :size="16"
+                                        style="color: var(--text-faint); vertical-align: middle"
+                                    />
                                 </td>
                             </tr>
                         </tbody>
@@ -682,11 +690,7 @@ onMounted(async () => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="sheetLoading">
-                                <td colspan="5" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
+                            <TableSkeleton v-if="sheetLoading" :columns="5" />
                             <tr v-for="line in sheet" v-else :key="line.staffId">
                                 <td>
                                     <div class="flex items-center gap-2.5">
@@ -727,15 +731,15 @@ onMounted(async () => {
             </template>
 
             <template v-else-if="tab === 'contracts'">
-                <p v-if="payrollLoading" class="py-8 text-center text-[12.5px]" style="color: var(--text-faint)">
-                    Chargement…
-                </p>
+                <div v-if="payrollLoading" class="grid-12 p-4">
+                    <i v-for="n in 4" :key="n" class="sk h-[74px] c3" />
+                </div>
                 <template v-else-if="payroll">
                     <div class="grid-12 p-4">
                         <div class="card p-4" style="grid-column: span 3">
                             <span class="kpi-label">Masse salariale / mois</span>
                             <span class="kpi-value">
-                                {{ Math.round(payroll.monthlyPayroll).toLocaleString('fr-FR') }}<small>FCFA</small>
+                                {{ fm(payroll.monthlyPayroll) }}<small>FCFA</small>
                             </span>
                             <!-- Le dénominateur est dit : sans lui, ce total se lirait comme
                                  couvrant tout l'effectif alors qu'il ne couvre que les fiches
@@ -749,7 +753,7 @@ onMounted(async () => {
                             <span class="kpi-label">Salaire moyen</span>
                             <span class="kpi-value">
                                 <template v-if="payroll.averageSalary != null">
-                                    {{ Math.round(payroll.averageSalary).toLocaleString('fr-FR') }}<small>FCFA</small>
+                                    {{ fm(payroll.averageSalary) }}<small>FCFA</small>
                                 </template>
                                 <template v-else>—</template>
                             </span>
@@ -829,7 +833,7 @@ onMounted(async () => {
                                     <td class="num">{{ row.weeklyHours ?? '—' }}</td>
                                     <td class="num">
                                         {{ row.monthlySalary
-                                            ? `${Math.round(Number(row.monthlySalary)).toLocaleString('fr-FR')} F`
+                                            ? `${fm(Number(row.monthlySalary))} F`
                                             : '—' }}
                                     </td>
                                 </tr>
@@ -881,7 +885,7 @@ onMounted(async () => {
                                     <button
                                         v-if="!row.userId" class="btn-ghost btn-sm"
                                         @click="openGrant(row)"
-                                    >Ouvrir un accès</button>
+                                    ><BoIcon name="plus" :size="15" />Ouvrir un accès</button>
                                     <button
                                         v-else-if="row.accessEnabled" class="btn-ghost btn-sm"
                                         @click="revoke(row)"
@@ -955,7 +959,8 @@ onMounted(async () => {
                 <button
                     class="btn-primary" :disabled="grantWorking || !grantForm.username"
                     @click="confirmGrant"
-                >{{ grantWorking ? 'Ouverture…' : 'Ouvrir l’accès' }}</button>
+                >
+                    <BoIcon name="plus" :size="16" />{{ grantWorking ? 'Ouverture…' : 'Ouvrir l’accès' }}</button>
                 <button class="btn-secondary" @click="granting = null">Annuler</button>
             </template>
         </SideDrawer>

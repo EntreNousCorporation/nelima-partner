@@ -90,6 +90,7 @@ async function submit() {
             </UiCard>
 
             <UiCard
+                id="securite"
                 style="grid-column: span 7"
                 title="Mot de passe"
                 sub="Il protège les données de paiement de toutes vos familles"
@@ -130,6 +131,7 @@ async function submit() {
 
                     <div>
                         <button type="submit" class="btn-primary" :disabled="saving || !ready">
+                            <BoIcon name="check" :size="16" />
                             {{ saving ? 'Enregistrement…' : 'Changer le mot de passe' }}
                         </button>
                     </div>

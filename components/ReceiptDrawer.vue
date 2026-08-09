@@ -22,12 +22,7 @@ defineEmits<{ close: [] }>();
                 class="w-10 h-10 rounded-xl grid place-items-center shrink-0"
                 style="background: var(--brand-50); color: var(--brand-700)"
             >
-                <svg
-                    class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
-                >
-                    <path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6" />
-                </svg>
+                <BoIcon name="receipt" :size="20" />
             </div>
         </template>
 
@@ -100,7 +95,7 @@ defineEmits<{ close: [] }>();
             <a
                 :href="`/api/v1/receipts/${receipt.id}/pdf`"
                 :download="`recu-${receipt.number}.pdf`" class="btn-primary flex-1"
-            >Télécharger le reçu</a>
+            ><BoIcon name="download" :size="16" />Télécharger le reçu</a>
         </template>
     </SideDrawer>
 </template>

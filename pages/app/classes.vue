@@ -205,7 +205,8 @@ onMounted(async () => {
                 : 'Répartition des élèves et remplissage des salles'"
         >
             <template #actions>
-                <button class="btn-primary" @click="openCreate">Nouvelle classe</button>
+                <button class="btn-primary" @click="openCreate">
+                    <BoIcon name="plus" :size="16" />Nouvelle classe</button>
             </template>
         </PageHead>
 
@@ -276,6 +277,7 @@ onMounted(async () => {
 
                 <div class="flex gap-2 mt-4">
                     <button type="submit" class="btn-primary" :disabled="saving || !form.name || !form.capacity">
+                        <BoIcon name="check" :size="16" />
                         {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                     </button>
                     <button type="button" class="btn-secondary" @click="showForm = false">Annuler</button>
@@ -284,30 +286,21 @@ onMounted(async () => {
         </UiCard>
 
         <div class="grid-12 mb-3.5">
-            <div
-                v-for="group in byCycle" :key="group.key" class="card p-4"
+            <KpiCard
+                v-for="group in byCycle" :key="group.key"
                 :style="`grid-column: span ${Math.max(2, Math.floor(12 / byCycle.length))}`"
-            >
-                <span class="kpi-label">{{ group.label }}</span>
-                <span class="kpi-value">{{ group.students }}<small>élèves</small></span>
-                <span class="kpi-foot">
-                    {{ group.count }} classe{{ group.count > 1 ? 's' : '' }}
-                    <template v-if="group.capacity">
-                        · {{ Math.round(group.students / group.capacity * 100) }} % de remplissage
-                    </template>
-                </span>
-            </div>
+                :label="group.label" icon="layers"
+                :value="String(group.students)" unit="élèves"
+                :foot="group.capacity
+                    ? `${group.count} classe(s) · ${Math.round(group.students / group.capacity * 100)} % de remplissage`
+                    : `${group.count} classe(s)`"
+            />
         </div>
 
         <UiCard :pad="false">
             <div class="tbar">
                 <label class="inp" style="flex: 0 1 240px">
-                    <svg
-                        class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round"
-                    >
-                        <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                    </svg>
+                    <BoIcon name="search" :size="15" />
                     <input
                         v-model="keyword" type="search" class="w-full"
                         placeholder="Classe ou titulaire…" aria-label="Rechercher une classe"
@@ -339,18 +332,14 @@ onMounted(async () => {
                             <th>Titulaire</th>
                             <th>Salle</th>
                             <th style="width: 180px">Remplissage</th>
-                            <th class="text-right">Reste dû</th>
+                            <th class="r">Reste dû</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="loading">
-                            <td colspan="8" class="py-8 text-center" style="color: var(--text-faint)">
-                                Chargement…
-                            </td>
-                        </tr>
+                        <TableSkeleton v-if="loading" :columns="8" />
                         <tr
-                            v-for="row in filtered" v-else :key="row.id" class="cursor-pointer"
+                            v-for="row in filtered" v-else :key="row.id" class="cl"
                             @click="opened = row"
                         >
                             <td>
@@ -398,14 +387,21 @@ onMounted(async () => {
                             </td>
                             <td class="num" :style="Number(row.outstandingAmount) > 0
                                 ? 'color: var(--danger)' : 'color: var(--text-faint)'">
-                                {{ Math.round(Number(row.outstandingAmount ?? 0)).toLocaleString('fr-FR') }} F
+                                {{ fm(Number(row.outstandingAmount ?? 0)) }} F
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <button class="btn-ghost btn-sm" @click.stop="openEdit(row)">Modifier</button>
+                                <button
+                                    class="btn-ghost btn-sm" title="Modifier la classe"
+                                    @click.stop="openEdit(row)"
+                                ><BoIcon name="edit" :size="15" /></button>
                                 <button
                                     v-if="row.studentCount === 0" class="btn-ghost btn-sm"
-                                    @click.stop="destroy(row)"
-                                >Supprimer</button>
+                                    title="Supprimer la classe" @click.stop="destroy(row)"
+                                ><BoIcon name="ban" :size="15" /></button>
+                                <BoIcon
+                                    name="chevron-right" :size="16"
+                                    style="color: var(--text-faint); vertical-align: middle"
+                                />
                             </td>
                         </tr>
                     </tbody>

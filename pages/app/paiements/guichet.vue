@@ -141,7 +141,7 @@ onMounted(load);
 
 <template>
     <div>
-        <PageHead title="Encaissement" :sub="`Guichet · ${todayLabel}`">
+        <PageHead title="Paiements" :sub="`Guichet · ${todayLabel}`">
             <template #actions>
                 <NuxtLink to="/app/paiements/recus" class="btn-secondary">Tous les reçus</NuxtLink>
             </template>
@@ -162,12 +162,7 @@ onMounted(load);
                         class="w-14 h-14 rounded-full grid place-items-center mx-auto mb-3.5"
                         style="background: var(--success-soft); color: var(--success)"
                     >
-                        <svg
-                            class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-                        >
-                            <path d="M20 6L9 17l-5-5" />
-                        </svg>
+                        <BoIcon name="check" :size="16" />
                     </div>
                     <h4 class="text-[17px] font-black" style="color: var(--navy)">
                         Encaissement enregistré
@@ -181,8 +176,10 @@ onMounted(load);
                             :href="`/api/v1/receipts/${issued.id}/pdf`"
                             :download="`recu-${issued.number}.pdf`"
                             class="btn-primary"
-                        >Télécharger le reçu</a>
-                        <button class="btn-secondary" @click="reset">Nouvel encaissement</button>
+                        ><BoIcon name="download" :size="16" />Télécharger le reçu</a>
+                        <button class="btn-secondary" @click="reset">
+                            <BoIcon name="plus" :size="16" />Nouvel encaissement
+                        </button>
                     </div>
                 </div>
 
@@ -365,11 +362,7 @@ onMounted(load);
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="loading">
-                                <td colspan="6" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
+                            <TableSkeleton v-if="loading" :columns="6" />
                             <tr v-for="row in dayReceipts" v-else :key="row.id">
                                 <td class="nu text-[12.5px] font-semibold" style="color: var(--text-muted)">
                                     {{ formatTime(row.issuedAt) }}

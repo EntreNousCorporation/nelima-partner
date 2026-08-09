@@ -26,7 +26,7 @@ const classes = ref<SchoolClass[]>([]);
 const loading = ref(true);
 const error = ref('');
 
-const shownKinds = ref<CalendarEntryKind[]>(['SCHOOL_LIFE', 'FEE_DUE', 'EXAM']);
+const shownKinds = ref<CalendarEntryKind[]>(['SCHOOL_LIFE', 'FEE_DUE', 'EXAM', 'ACADEMIC_PERIOD']);
 const opened = ref<CalendarEntry | null>(null);
 
 const canWrite = computed(() => can('calendar:write'));
@@ -229,9 +229,11 @@ onMounted(async () => {
         >
             <template #actions>
                 <a class="btn-secondary" :href="exportUrl(range.from, range.to)" download>
+                    <BoIcon name="download" :size="16" />
                     Exporter (iCal)
                 </a>
                 <button v-if="canWrite" class="btn-primary" @click="openCreate()">
+                    <BoIcon name="plus" :size="16" />
                     Nouvel événement
                 </button>
             </template>
@@ -323,6 +325,7 @@ onMounted(async () => {
 
                 <div class="flex gap-2 mt-4">
                     <button type="submit" class="btn-primary" :disabled="saving || !form.title">
+                        <BoIcon name="check" :size="16" />
                         {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                     </button>
                     <button type="button" class="btn-secondary" @click="showForm = false">
@@ -416,8 +419,8 @@ onMounted(async () => {
                     :sub="inMonth.length ? `${inMonth.length} entrée(s) ce mois` : 'Rien ce mois'"
                     :pad="false"
                 >
-                    <div v-if="loading" class="p-4 text-[12.5px]" style="color: var(--text-faint)">
-                        Chargement…
+                    <div v-if="loading" class="p-4 flex flex-col gap-3">
+                        <i v-for="n in 3" :key="n" class="sk h-8" />
                     </div>
                     <div v-else-if="inMonth.length">
                         <button
@@ -460,7 +463,7 @@ onMounted(async () => {
                         <div class="flex justify-between gap-2 mb-1">
                             <b class="text-[12px]" style="color: var(--navy)">{{ entry.title }}</b>
                             <span class="nu text-[12px] font-bold" style="color: var(--brand-700)">
-                                {{ Math.round(Number(entry.amountExpected ?? 0)).toLocaleString('fr-FR') }} F
+                                {{ fm(Number(entry.amountExpected ?? 0)) }} F
                             </span>
                         </div>
                         <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--surface-sunken)">

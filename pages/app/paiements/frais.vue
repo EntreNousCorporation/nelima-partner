@@ -56,7 +56,7 @@ const totalMatches = computed(() =>
 
 function formatAmount(value?: number | string) {
     const n = Number(value ?? 0);
-    return n.toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
+    return fcfa(n);
 }
 
 function formatDate(value?: string) {
@@ -199,11 +199,12 @@ onMounted(async () => {
 <template>
     <div>
         <PageHead
-            title="Frais et échéanciers"
+            title="Paiements"
             sub="Définis par niveau, appliqués automatiquement aux élèves concernés"
         >
             <template #actions>
                 <button class="btn-primary" @click="showForm = !showForm">
+                    <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
                     {{ showForm ? 'Annuler' : 'Nouveau frais' }}
                 </button>
             </template>
@@ -259,6 +260,7 @@ onMounted(async () => {
                     type="submit" class="btn-primary mt-4"
                     :disabled="saving || !form.name || !form.price || !form.levelOfStudiesCodes.length"
                 >
+                    <BoIcon name="check" :size="16" />
                     {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                 </button>
             </form>
@@ -281,11 +283,7 @@ onMounted(async () => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="loading">
-                                <td colspan="4" class="py-8 text-center" style="color: var(--text-faint)">
-                                    Chargement…
-                                </td>
-                            </tr>
+                            <TableSkeleton v-if="loading" :columns="4" />
                             <tr
                                 v-for="fee in fees" v-else :key="fee.id" class="cursor-pointer"
                                 :style="selected?.id === fee.id ? 'background: var(--brand-50)' : ''"
@@ -406,6 +404,7 @@ onMounted(async () => {
                     </div>
 
                     <button type="button" class="btn-secondary btn-sm" @click="addSchedule">
+                        <BoIcon name="plus" :size="15" />
                         Ajouter une tranche
                     </button>
 

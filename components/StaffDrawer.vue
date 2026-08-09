@@ -113,7 +113,7 @@ async function detach(classId: string) {
                     <dt class="flex-1 text-[12.5px]" style="color: var(--text-faint)">Brut mensuel</dt>
                     <dd class="text-[12.5px] font-semibold nu">
                         {{ member.monthlySalary
-                            ? `${Math.round(Number(member.monthlySalary)).toLocaleString('fr-FR')} FCFA`
+                            ? `${fm(Number(member.monthlySalary))} FCFA`
                             : '—' }}
                     </dd>
                 </div>

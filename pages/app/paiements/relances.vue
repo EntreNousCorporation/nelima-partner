@@ -131,11 +131,12 @@ onMounted(async () => {
 <template>
     <div>
         <PageHead
-            title="Relances"
+            title="Paiements"
             sub="Campagnes de relance et tranches encore dues"
         >
             <template #actions>
                 <NuxtLink to="/app/paiements/guichet" class="btn-primary">
+                    <BoIcon name="cash" :size="16" />
                     Encaisser au guichet
                 </NuxtLink>
             </template>
@@ -145,169 +146,170 @@ onMounted(async () => {
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
-        <UiCard
-            v-if="canSend" class="mb-3.5" title="Nouvelle campagne"
-            sub="Le décompte s'affiche avant l'envoi : un SMS se facture à la pièce"
-        >
-            <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                    <label class="field-label" for="campaign-name">Nom de la campagne</label>
-                    <input
-                        id="campaign-name" v-model="campaign.name" type="text"
-                        placeholder="Relance scolarité février" class="input"
-                    />
+        <!-- Deux colonnes, comme la maquette : sans l'historique en regard, on lance
+             une campagne sans voir ce que les précédentes ont donné. -->
+        <div class="grid-12 mb-3.5">
+            <UiCard v-if="history.length" class="c7" :pad="false" title="Campagnes lancées"
+                sub="Une famille qui règle dans les sept jours est portée au crédit de la campagne">
+                <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Campagne</th>
+                                <th>Canal</th>
+                                <th class="text-right">Envoyés</th>
+                                <th class="text-right">Écartés</th>
+                                <th class="text-right">Payés</th>
+                                <th class="text-right">Recouvré</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="line in history" :key="line.id">
+                                <td>
+                                    <b class="text-[12.5px]" style="color: var(--navy)">{{ line.name }}</b>
+                                    <div class="text-[11px]" style="color: var(--text-faint)">
+                                        {{ line.targetLabel }} ·
+                                        {{ new Date(line.sentAt).toLocaleDateString('fr-FR') }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <span v-for="c in line.channels" :key="c" class="tag mr-1">
+                                        {{ reminderChannelLabel(c) }}
+                                    </span>
+                                </td>
+                                <td class="num">{{ line.sentCount }}</td>
+                                <td class="num" style="color: var(--text-faint)">
+                                    {{ line.skippedCount || '—' }}
+                                </td>
+                                <td class="num">{{ line.paidCount }}</td>
+                                <td class="num">
+                                    {{ fm(Number(line.recoveredAmount ?? 0)) }} F
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <div>
-                    <label class="field-label" for="campaign-target">Cible</label>
-                    <select id="campaign-target" v-model="campaign.target" class="select">
-                        <option v-for="t in targetCounts" :key="t.target" :value="t.target">
-                            {{ t.label }} — {{ t.familyCount }} famille(s)
-                        </option>
-                    </select>
-                </div>
-                <div>
-                    <span class="field-label">Canaux</span>
-                    <div class="flex gap-1.5 flex-wrap mt-1">
-                        <button
-                            v-for="channel in REMINDER_CHANNELS" :key="channel.value" type="button"
-                            class="chip" :aria-pressed="campaign.channels.includes(channel.value)"
-                            @click="toggleChannel(channel.value)"
-                        >{{ channel.label }}</button>
+            </UiCard>
+
+            <UiCard
+                v-if="canSend" :class="history.length ? 'c5' : 'c12'" title="Nouvelle campagne"
+                sub="Le décompte s'affiche avant l'envoi : un SMS se facture à la pièce"
+            >
+                <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                        <label class="field-label" for="campaign-name">Nom de la campagne</label>
+                        <input
+                            id="campaign-name" v-model="campaign.name" type="text"
+                            placeholder="Relance scolarité février" class="input"
+                        />
+                    </div>
+                    <div>
+                        <label class="field-label" for="campaign-target">Cible</label>
+                        <select id="campaign-target" v-model="campaign.target" class="select">
+                            <option v-for="t in targetCounts" :key="t.target" :value="t.target">
+                                {{ t.label }} — {{ t.familyCount }} famille(s)
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="field-label">Canaux</span>
+                        <div class="flex gap-1.5 flex-wrap mt-1">
+                            <button
+                                v-for="channel in REMINDER_CHANNELS" :key="channel.value" type="button"
+                                class="chip" :aria-pressed="campaign.channels.includes(channel.value)"
+                                @click="toggleChannel(channel.value)"
+                            >{{ channel.label }}</button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <label class="field-label mt-3.5" for="campaign-message">Message</label>
-            <textarea
-                id="campaign-message" v-model="campaign.messageTemplate" rows="3" maxlength="300"
-                class="input" style="resize: vertical"
-            />
-            <p class="text-[11.5px] mt-1" style="color: var(--text-faint)">
-                Variables remplacées par famille :
-                <b v-for="v in TEMPLATE_VARIABLES" :key="v" class="nu mr-1.5">{{ v }}</b>
-                · {{ campaign.messageTemplate.length }}/300 caractères
-            </p>
+                <label class="field-label mt-3.5" for="campaign-message">Message</label>
+                <textarea
+                    id="campaign-message" v-model="campaign.messageTemplate" rows="3" maxlength="300"
+                    class="input" style="resize: vertical"
+                />
+                <p class="text-[11.5px] mt-1" style="color: var(--text-faint)">
+                    Variables remplacées par famille :
+                    <b v-for="v in TEMPLATE_VARIABLES" :key="v" class="nu mr-1.5">{{ v }}</b>
+                    · {{ campaign.messageTemplate.length }}/300 caractères
+                </p>
 
-            <!-- Le décompte est le garde-fou de l'écran : il dit ce qu'on s'apprête à dépenser
-                 avant qu'on clique, et non après. -->
-            <div
-                class="card p-3.5 mt-3.5"
-                :style="smsPlanned ? 'border-color: var(--warning-solid)' : ''"
-            >
-                <div class="text-[12.5px]" style="color: var(--text)">
-                    <b class="nu" style="color: var(--navy)">{{ selectedTarget?.familyCount ?? 0 }}</b>
-                    famille(s) ·
-                    <b class="nu" style="color: var(--navy)">{{ selectedTarget?.recipientCount ?? 0 }}</b>
-                    tuteur(s) joignable(s) ·
-                    <b class="nu" style="color: var(--navy)">{{ plannedSends }}</b>
-                    envoi(s)
-                    <template v-if="selectedTarget">
-                        · {{ Math.round(Number(selectedTarget.amountDue)).toLocaleString('fr-FR') }} F en jeu
-                    </template>
+                <!-- Le décompte est le garde-fou de l'écran : il dit ce qu'on s'apprête à dépenser
+                     avant qu'on clique, et non après. -->
+                <div
+                    class="card p-3.5 mt-3.5"
+                    :style="smsPlanned ? 'border-color: var(--warning-solid)' : ''"
+                >
+                    <div class="text-[12.5px]" style="color: var(--text)">
+                        <b class="nu" style="color: var(--navy)">{{ selectedTarget?.familyCount ?? 0 }}</b>
+                        famille(s) ·
+                        <b class="nu" style="color: var(--navy)">{{ selectedTarget?.recipientCount ?? 0 }}</b>
+                        tuteur(s) joignable(s) ·
+                        <b class="nu" style="color: var(--navy)">{{ plannedSends }}</b>
+                        envoi(s)
+                        <template v-if="selectedTarget">
+                            · {{ fm(Number(selectedTarget.amountDue)) }} F en jeu
+                        </template>
+                    </div>
+                    <p v-if="smsPlanned" class="text-[12px] mt-1.5" style="color: var(--warning)">
+                        Dont <b class="nu">{{ smsPlanned }}</b> SMS, facturés à l'envoi.
+                    </p>
+                    <p v-else class="text-[12px] mt-1.5" style="color: var(--text-faint)">
+                        Notification seule : aucun coût d'envoi.
+                    </p>
                 </div>
-                <p v-if="smsPlanned" class="text-[12px] mt-1.5" style="color: var(--warning)">
-                    Dont <b class="nu">{{ smsPlanned }}</b> SMS, facturés à l'envoi.
+
+                <p v-if="sendError" class="alert-danger mt-3.5" role="alert">{{ sendError }}</p>
+                <p v-if="lastResult" class="alert-success mt-3.5" role="status">
+                    « {{ lastResult.name }} » : {{ lastResult.sentCount }} envoi(s)<template
+                        v-if="lastResult.skippedCount"
+                    >, {{ lastResult.skippedCount }} écarté(s) — déjà relancé(s) aujourd'hui</template>.
                 </p>
-                <p v-else class="text-[12px] mt-1.5" style="color: var(--text-faint)">
-                    Notification seule : aucun coût d'envoi.
-                </p>
-            </div>
 
-            <p v-if="sendError" class="alert-danger mt-3.5" role="alert">{{ sendError }}</p>
-            <p v-if="lastResult" class="alert-success mt-3.5" role="status">
-                « {{ lastResult.name }} » : {{ lastResult.sentCount }} envoi(s)<template
-                    v-if="lastResult.skippedCount"
-                >, {{ lastResult.skippedCount }} écarté(s) — déjà relancé(s) aujourd'hui</template>.
-            </p>
-
-            <div class="flex gap-2 mt-4">
-                <button
-                    class="btn-primary"
-                    :disabled="sending || !campaign.name || !campaign.channels.length || !plannedSends"
-                    @click="launch"
-                >{{ sending ? 'Envoi…' : `Lancer la campagne (${plannedSends} envoi(s))` }}</button>
-            </div>
-        </UiCard>
-
-        <UiCard v-if="history.length" class="mb-3.5" :pad="false" title="Campagnes lancées"
-            sub="Une famille qui règle dans les sept jours est portée au crédit de la campagne">
-            <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Campagne</th>
-                            <th>Canal</th>
-                            <th class="text-right">Envoyés</th>
-                            <th class="text-right">Écartés</th>
-                            <th class="text-right">Payés</th>
-                            <th class="text-right">Recouvré</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="line in history" :key="line.id">
-                            <td>
-                                <b class="text-[12.5px]" style="color: var(--navy)">{{ line.name }}</b>
-                                <div class="text-[11px]" style="color: var(--text-faint)">
-                                    {{ line.targetLabel }} ·
-                                    {{ new Date(line.sentAt).toLocaleDateString('fr-FR') }}
-                                </div>
-                            </td>
-                            <td>
-                                <span v-for="c in line.channels" :key="c" class="tag mr-1">
-                                    {{ reminderChannelLabel(c) }}
-                                </span>
-                            </td>
-                            <td class="num">{{ line.sentCount }}</td>
-                            <td class="num" style="color: var(--text-faint)">
-                                {{ line.skippedCount || '—' }}
-                            </td>
-                            <td class="num">{{ line.paidCount }}</td>
-                            <td class="num">
-                                {{ Math.round(Number(line.recoveredAmount ?? 0)).toLocaleString('fr-FR') }} F
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </UiCard>
+                <div class="flex gap-2 mt-4">
+                    <button
+                        class="btn-primary"
+                        :disabled="sending || !campaign.name || !campaign.channels.length || !plannedSends"
+                        @click="launch"
+                    >{{ sending ? 'Envoi…' : `Lancer la campagne (${plannedSends} envoi(s))` }}</button>
+                </div>
+            </UiCard>
+        </div>
 
 
         <div class="grid-12 mb-3.5">
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Reste à recouvrer</span>
-                <span class="kpi-value">{{ formatAmount(total).replace(' FCFA', '') }}<small>FCFA</small></span>
-                <span class="kpi-foot">sur les échéances dépassées</span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Familles concernées</span>
-                <span class="kpi-value">{{ familyCount }}</span>
-                <span class="kpi-foot">
-                    {{ filtered.length }} tranche{{ filtered.length > 1 ? 's' : '' }} en retard
-                </span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Retard le plus ancien</span>
-                <span class="kpi-value">{{ oldest }}<small>jours</small></span>
-                <span class="kpi-foot">depuis la date d'échéance</span>
-            </div>
-            <div class="card p-4" style="grid-column: span 3">
-                <span class="kpi-label">Au-delà d'un mois</span>
-                <span class="kpi-value">{{ overThirty }}</span>
-                <!-- Le seuil n'est pas décoratif : passé un mois, un rappel écrit ne suffit
-                     généralement plus et l'école reprend contact directement. -->
-                <span class="kpi-foot">à traiter par un contact direct</span>
-            </div>
+            <KpiCard
+                class="c3" label="Reste à recouvrer" icon="cash"
+                tip="Somme des tranches dont l'échéance est passée sans règlement, sur le périmètre filtré."
+                :value="formatAmount(total).replace(' FCFA', '')" unit="FCFA"
+                foot="sur les échéances dépassées"
+            />
+            <KpiCard
+                class="c3" label="Familles concernées" icon="students"
+                tip="Nombre d'élèves distincts en retard. Une famille de deux enfants en retard compte deux fois ici, et une seule à l'envoi : le registre écarte les doublons."
+                :value="String(familyCount)"
+                :foot="`${filtered.length} tranche(s) en retard`"
+            />
+            <KpiCard
+                class="c3" label="Retard le plus ancien" icon="clock"
+                tip="Ancienneté de la plus vieille échéance dépassée, en jours depuis sa date limite."
+                :value="String(oldest)" unit="jours"
+                foot="depuis la date d'échéance"
+            />
+            <!-- Le seuil n'est pas décoratif : passé un mois, un rappel écrit ne suffit
+                 généralement plus et l'école reprend contact directement. -->
+            <KpiCard
+                class="c3" label="Au-delà d'un mois" icon="alert"
+                tip="Tranches en retard de plus de trente jours. Passé ce délai, un rappel écrit ne suffit généralement plus."
+                :value="String(overThirty)"
+                foot="à traiter par un contact direct"
+            />
         </div>
 
         <UiCard :pad="false">
             <div class="tbar">
                 <label class="inp" style="flex: 0 1 260px">
-                    <svg
-                        class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round"
-                    >
-                        <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
-                    </svg>
+                    <BoIcon name="search" :size="15" />
                     <input
                         v-model="keyword" type="search" class="w-full"
                         placeholder="Nom ou matricule…" aria-label="Rechercher un élève"
@@ -334,11 +336,7 @@ onMounted(async () => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="loading">
-                            <td colspan="5" class="py-8 text-center" style="color: var(--text-faint)">
-                                Chargement…
-                            </td>
-                        </tr>
+                        <TableSkeleton v-if="loading" :columns="5" />
                         <tr v-for="row in filtered" v-else :key="row.id">
                             <td>
                                 <div class="flex items-center gap-2.5">

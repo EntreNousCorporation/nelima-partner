@@ -25,6 +25,22 @@ export function cycleLabel(cycle?: EducationCycle | null) {
     return CYCLES.find((c) => c.value === cycle)?.label ?? 'Autres niveaux';
 }
 
+export type GuardianContact = {
+    type: 'EMAIL' | 'PHONE' | string;
+    value: string;
+    isPrimary?: boolean;
+    whatsApp?: boolean;
+};
+
+/** Parent / tuteur rattaché à un élève. Servi par `/students/search` dans `parentUsers`. */
+export type Guardian = {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    contacts?: GuardianContact[];
+};
+
 export type Student = {
     id: string;
     firstName: string;
@@ -34,6 +50,11 @@ export type Student = {
     placeOfBirth?: string;
     levelOfStudy?: LevelOfStudy;
     schoolClass?: { id: string; name: string; room?: string };
+    /** Servi sur la liste : ce que la famille doit encore, et la part déjà échue. */
+    outstandingAmount?: number;
+    overdueAmount?: number;
+    /** Parents / tuteurs rattachés à l'élève (source : `parentUsers` de `/students/search`). */
+    parentUsers?: Guardian[];
 };
 
 export type Page<T> = {

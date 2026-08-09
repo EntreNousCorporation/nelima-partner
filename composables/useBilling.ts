@@ -50,8 +50,9 @@ export function formatTime(value?: string) {
     return new Date(value).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
+/** Conservée pour les appelants existants ; la mise en forme est celle de `useMoney`. */
 export function formatAmount(value?: number | string) {
-    return Number(value ?? 0).toLocaleString('fr-FR').replace(/ | /g, ' ') + ' FCFA';
+    return fcfa(Number(value ?? 0));
 }
 
 export function formatDate(value?: string) {

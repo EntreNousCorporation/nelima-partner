@@ -62,12 +62,31 @@ export type ActivityForm = {
     price?: number | string;
 };
 
-export const ACTIVITY_KINDS: { value: ActivityKind; label: string }[] = [
-    { value: 'SPORT', label: 'Sport' },
-    { value: 'ARTS', label: 'Art & culture' },
-    { value: 'LANGUAGE', label: 'Langue' },
-    { value: 'TUTORING', label: 'Soutien scolaire' },
+/**
+ * Natures d'activité, avec le symbole et la teinte qui les distinguent au catalogue.
+ *
+ * Le prototype donne un symbole par activité ; nous n'avons que sa nature en base, donc un symbole
+ * par nature. C'est ce qui fait qu'une liste de dix lignes se parcourt du regard : on repère le
+ * sport avant d'avoir lu le libellé.
+ */
+export const ACTIVITY_KINDS: {
+    value: ActivityKind; label: string; icon: string; color: string; soft: string;
+}[] = [
+    { value: 'SPORT', label: 'Sport', icon: 'ball', color: 'var(--success)', soft: 'var(--success-soft)' },
+    { value: 'ARTS', label: 'Art & culture', icon: 'palette', color: 'var(--purple)', soft: 'var(--purple-soft)' },
+    { value: 'LANGUAGE', label: 'Langue', icon: 'globe', color: 'var(--brand-700)', soft: 'var(--brand-50)' },
+    { value: 'TUTORING', label: 'Soutien scolaire', icon: 'book', color: 'var(--warning)', soft: 'var(--warning-soft)' },
 ];
+
+export function kindIcon(kind?: ActivityKind | null) {
+    return ACTIVITY_KINDS.find((k) => k.value === kind)?.icon ?? 'sparkles';
+}
+
+/** Couleur du symbole et fond de sa pastille. */
+export function kindTone(kind?: ActivityKind | null) {
+    const found = ACTIVITY_KINDS.find((k) => k.value === kind);
+    return { color: found?.color ?? 'var(--text-muted)', background: found?.soft ?? 'var(--surface-sunken)' };
+}
 
 export const ACTIVITY_STATUSES: { value: ActivityStatus; label: string }[] = [
     { value: 'DRAFT', label: 'Brouillon' },
