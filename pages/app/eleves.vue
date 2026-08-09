@@ -20,6 +20,7 @@ import { useAuthStore } from '~/stores/auth';
 
 const auth = useAuthStore();
 const { search, establishmentLevels, create } = useStudents();
+const { assign: assignToClass } = useClasses();
 
 const students = ref<Student[]>([]);
 const levelOptions = ref<LevelOfStudy[]>([]);
@@ -31,6 +32,7 @@ const selectedLevel = ref<string>('');
 const selectedClass = ref<string>('');
 const keyword = ref('');
 const classOptions = ref<SchoolClass[]>([]);
+const formClass = ref<string>('');
 const loading = ref(false);
 const loadError = ref('');
 
@@ -140,16 +142,29 @@ async function load() {
     }
 }
 
+// Une classe appartient à un niveau : choisir la classe fixe le niveau, pour ne pas saisir deux
+// fois la même information à l'inscription.
+function onFormClassChange() {
+    const chosen = classOptions.value.find((c) => c.id === formClass.value);
+    if (chosen?.levelCode) form.levelOfStudyCode = chosen.levelCode;
+}
+
 async function submit() {
     formError.value = '';
     saving.value = true;
     try {
-        await create({ ...form });
+        const created = await create({ ...form });
+        // Inscription en une étape : si une classe est choisie, on y affecte l'élève dans la foulée,
+        // au lieu d'imposer une seconde manipulation depuis le tiroir de classe.
+        if (formClass.value && created?.id) {
+            await assignToClass(formClass.value, [created.id]);
+        }
         showForm.value = false;
         Object.assign(form, {
             firstName: '', lastName: '', registrationNumber: '',
             birthDay: '', placeOfBirth: '', levelOfStudyCode: '',
         });
+        formClass.value = '';
         // On revient en première page : l'élève créé n'est pas nécessairement sur la page courante.
         page.value = 0;
         await load();
@@ -278,6 +293,15 @@ onMounted(async () => {
                     <div>
                         <label class="field-label" for="placeOfBirth">Lieu de naissance</label>
                         <input id="placeOfBirth" v-model="form.placeOfBirth" type="text" required class="input" />
+                    </div>
+                    <div>
+                        <label class="field-label" for="formClass">Classe</label>
+                        <select id="formClass" v-model="formClass" class="select" @change="onFormClassChange">
+                            <option value="">Sans classe (à répartir plus tard)</option>
+                            <option v-for="c in classOptions" :key="c.id" :value="c.id">
+                                {{ c.name }}<template v-if="c.levelLabel"> · {{ c.levelLabel }}</template>
+                            </option>
+                        </select>
                     </div>
                     <div>
                         <label class="field-label" for="level">Niveau</label>
