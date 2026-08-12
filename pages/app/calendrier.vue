@@ -263,7 +263,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="kind">Nature</label>
-                        <select id="kind" v-model="form.kind" class="select">
+                        <select id="kind" v-model="form.kind" required class="select">
                             <option value="SCHOOL_LIFE">Vie scolaire</option>
                             <option value="EXAM">Examen</option>
                         </select>

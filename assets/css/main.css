@@ -289,6 +289,26 @@
         color: var(--text);
     }
 
+    /* L'astérisque des champs obligatoires, posée par le contrôle et non à la main.
+
+       Le libellé et son contrôle sont frères immédiats partout dans ce portail : la marque suit
+       donc l'attribut `required`, qui est déjà la source de vérité — c'est lui qui déclenche la
+       validation du navigateur, et il se calque sur les `@NotBlank` du serveur. Une astérisque
+       écrite dans le texte du libellé aurait pu mentir ; celle-ci ne le peut pas.
+
+       Les rares champs enveloppés dans un `div` portent `field-label--required` à la main : ils
+       sont six, tous des contrôles composés, et les compter à part vaut mieux qu'un sélecteur
+       plus large qui marquerait aussi les filtres de recherche. */
+    .field-label:has(+ input:required),
+    .field-label:has(+ select:required),
+    .field-label:has(+ textarea:required),
+    .field-label--required {
+        &::after {
+            content: " *";
+            color: var(--danger);
+        }
+    }
+
     .input,
     .select {
         @apply w-full h-10 px-3 text-sm outline-none transition-shadow;

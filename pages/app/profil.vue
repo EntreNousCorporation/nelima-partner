@@ -99,14 +99,14 @@ async function submit() {
                     <div>
                         <label class="field-label" for="current">Mot de passe actuel</label>
                         <input
-                            id="current" v-model="current" type="password" class="input"
+                            id="current" v-model="current" type="password" required class="input"
                             autocomplete="current-password"
                         />
                     </div>
                     <div>
                         <label class="field-label" for="next">Nouveau mot de passe</label>
                         <input
-                            id="next" v-model="next" type="password" class="input"
+                            id="next" v-model="next" type="password" required class="input"
                             autocomplete="new-password"
                         />
                         <p class="text-[12px] mt-1" style="color: var(--text-faint)">
@@ -116,7 +116,7 @@ async function submit() {
                     <div>
                         <label class="field-label" for="confirmation">Confirmation</label>
                         <input
-                            id="confirmation" v-model="confirmation" type="password" class="input"
+                            id="confirmation" v-model="confirmation" type="password" required class="input"
                             autocomplete="new-password"
                         />
                         <p v-if="mismatch" class="text-[12px] mt-1" style="color: var(--danger)">

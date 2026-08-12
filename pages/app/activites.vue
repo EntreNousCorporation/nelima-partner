@@ -318,7 +318,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="kind">Famille</label>
-                        <select id="kind" v-model="form.kind" class="select">
+                        <select id="kind" v-model="form.kind" required class="select">
                             <option v-for="kind in ACTIVITY_KINDS" :key="kind.value" :value="kind.value">
                                 {{ kind.label }}
                             </option>
