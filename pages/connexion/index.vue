@@ -30,35 +30,13 @@ async function submit() {
 
 <template>
     <div class="min-h-screen grid lg:grid-cols-2">
-        <!--
-            Panneau de gauche : il dit à qui s'adresse cet écran. Le portail école et l'application
-            parent partagent la même marque, et rien ne les distinguait à l'ouverture.
-            Masqué sous 1024 px, où toute la place doit aller au formulaire.
-        -->
-        <aside
-            class="hidden lg:flex flex-col justify-between p-12 text-white"
-            style="background: linear-gradient(150deg, var(--brand-700) 0%, var(--brand-900) 100%)"
-        >
-            <div class="flex items-center gap-3">
-                <NelimaMark :size="36" />
-                <span class="text-lg font-semibold tracking-tight">Nelima</span>
-            </div>
-
-            <div class="max-w-md">
-                <p class="text-3xl font-semibold leading-tight tracking-tight">
-                    La scolarité de votre établissement, tenue au jour le jour.
-                </p>
-                <p class="mt-4 text-white/70 leading-relaxed">
-                    Élèves, frais et échéanciers, encaissements au guichet comme en ligne,
-                    reçus numérotés — au même endroit.
-                </p>
-            </div>
-
-            <p class="text-sm text-white/50">Édité par YPYit · Abidjan</p>
-        </aside>
+        <!-- Il dit à qui s'adresse cet écran : le portail école et l'application parent partagent
+             la même marque, et rien ne les distinguait à l'ouverture. Partagé avec les deux écrans
+             de mot de passe. -->
+        <AuthAside />
 
         <main class="flex items-center justify-center p-6">
-            <form class="w-full max-w-sm" @submit.prevent="submit">
+            <form class="form-auth w-full max-w-sm" @submit.prevent="submit">
                 <div class="lg:hidden flex items-center gap-3 mb-8">
                     <NelimaMark :size="32" />
                     <span class="text-lg font-semibold">Nelima</span>
