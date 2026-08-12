@@ -6,6 +6,7 @@ import {
     type PayrollSummary, type PortalRole, type StaffMember, type StaffRole,
 } from '~/composables/useStaff';
 import type { SchoolClass } from '~/composables/useClasses';
+import { useAuthStore } from '~/stores/auth';
 
 /**
  * Répertoire du personnel.
@@ -16,10 +17,11 @@ import type { SchoolClass } from '~/composables/useClasses';
 const {
     list, create, update, remove,
     attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
-    grantAccess, revokeAccess,
+    grantAccess, revokeAccess, resendActivation: resendLink,
 } = useStaff();
 const { list: listClasses } = useClasses();
 const { can } = usePermissions();
+const auth = useAuthStore();
 
 const rows = ref<StaffMember[]>([]);
 const classes = ref<SchoolClass[]>([]);
@@ -149,6 +151,34 @@ async function confirmGrant() {
         grantError.value = e?.data?.debugMessage ?? "L'accès n'a pas pu être ouvert.";
     } finally {
         grantWorking.value = false;
+    }
+}
+
+/**
+ * Renvoie à ce compte son courriel de bienvenue et son lien de définition de mot de passe.
+ *
+ * <p>L'établissement est celui de la session, jamais un identifiant venu de l'écran : le serveur
+ * refuse de toute façon un compte qui n'appartient pas à l'école citée, mais rien ne justifie de
+ * laisser l'appelant proposer une autre école.
+ */
+const resendingId = ref<string | null>(null);
+const resendNotice = ref('');
+
+async function resendActivation(member: StaffMember) {
+    const establishmentId = auth.user?.establishmentId;
+    if (!member.userId || !establishmentId) return;
+
+    error.value = '';
+    resendNotice.value = '';
+    resendingId.value = member.userId;
+    try {
+        await resendLink(establishmentId, member.userId);
+        resendNotice.value = `Lien renvoyé à ${member.username ?? fullName(member)}.`
+            + ' Le précédent ne vaut plus.';
+    } catch (e: any) {
+        error.value = e?.data?.debugMessage ?? "Le lien n'a pas pu être renvoyé.";
+    } finally {
+        resendingId.value = null;
     }
 }
 
@@ -321,6 +351,7 @@ onMounted(async () => {
         </PageHead>
 
         <p v-if="error" class="alert-danger mb-3.5" role="alert">{{ error }}</p>
+        <p v-if="resendNotice" class="alert-success mb-3.5" role="status">{{ resendNotice }}</p>
 
         <UiCard
             v-if="showForm" class="mb-3.5"
@@ -886,10 +917,19 @@ onMounted(async () => {
                                         v-if="!row.userId" class="btn-ghost btn-sm"
                                         @click="openGrant(row)"
                                     ><BoIcon name="plus" :size="15" />Ouvrir un accès</button>
-                                    <button
-                                        v-else-if="row.accessEnabled" class="btn-ghost btn-sm"
-                                        @click="revoke(row)"
-                                    >Fermer l'accès</button>
+                                    <template v-else-if="row.accessEnabled">
+                                        <!-- Le premier courriel se perd, et le lien n'est valable
+                                             qu'une heure : sans ce bouton, la seule issue était de
+                                             fermer l'accès pour le rouvrir. -->
+                                        <button
+                                            v-if="canGrantAccess" class="btn-ghost btn-sm"
+                                            :disabled="resendingId === row.userId"
+                                            @click="resendActivation(row)"
+                                        >{{ resendingId === row.userId ? 'Envoi…' : 'Renvoyer le lien' }}</button>
+                                        <button class="btn-ghost btn-sm" @click="revoke(row)">
+                                            Fermer l'accès
+                                        </button>
+                                    </template>
                                     <!-- Rouvrir un accès fermé passe par la réactivation du compte,
                                          qui n'existe pas encore : mieux vaut ne rien proposer que
                                          proposer un bouton sans effet. -->

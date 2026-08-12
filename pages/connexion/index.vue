@@ -95,9 +95,14 @@ async function submit() {
                     </button>
                 </div>
 
+                <p class="mt-6 text-sm">
+                    <NuxtLink to="/connexion/oubli" style="color: var(--brand-700)">
+                        Mot de passe oublié ?
+                    </NuxtLink>
+                </p>
+
                 <p class="mt-8 text-xs" style="color: var(--text-faint)">
-                    Votre compte est créé par Nelima. En cas d'oubli, contactez votre
-                    administrateur.
+                    Votre compte est créé par Nelima.
                 </p>
             </form>
         </main>

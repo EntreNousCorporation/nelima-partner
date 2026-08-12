@@ -213,9 +213,23 @@ export function useStaff() {
         return api<StaffMember>(`/staff/${id}/access`, { method: 'DELETE' });
     }
 
+    /**
+     * Renvoie le courriel de bienvenue et son lien de définition de mot de passe.
+     *
+     * <p>La route est portée par l'établissement et non par la fiche de personnel : c'est le compte
+     * qui reçoit le lien, et le serveur vérifie qu'il appartient bien à l'école citée.
+     *
+     * @param establishmentId celui de la session, jamais un identifiant venu de l'écran
+     * @param userId le compte du membre — `StaffMember.userId`, nul tant qu'aucun accès n'est ouvert
+     */
+    function resendActivation(establishmentId: string, userId: string) {
+        return api(`/establishments/${establishmentId}/users/${userId}/resend-activation`,
+            { method: 'POST' });
+    }
+
     return {
         list, findById, create, update, remove, assignClasses, unassignClass,
         attendanceSheet, recordAttendance, attendanceSummary, payrollSummary,
-        grantAccess, revokeAccess,
+        grantAccess, revokeAccess, resendActivation,
     };
 }
