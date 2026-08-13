@@ -39,6 +39,7 @@ type ClassFilling = {
 
 type Summary = {
     studentCount: number;
+    levelCount: number;
     collectedThisMonth: number;
     receiptsThisMonth: number;
     collectedToday: number;
@@ -129,8 +130,11 @@ const steps = computed(() => [
     },
     {
         label: 'Déclarer les niveaux enseignés',
+        // Sur le nombre de niveaux, et non sur l'effectif : cette étape se cochait au même
+        // critère que la suivante, si bien qu'une école pouvait déclarer ses niveaux sans que la
+        // liste en prenne acte — elle ne s'achevait qu'au premier élève inscrit.
         hint: 'Un élève ne peut être inscrit que dans un niveau déclaré',
-        done: (summary.value?.studentCount ?? 0) > 0,
+        done: (summary.value?.levelCount ?? 0) > 0,
         to: '/app/parametres?section=niveaux',
     },
     {

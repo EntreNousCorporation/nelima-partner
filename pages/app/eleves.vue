@@ -102,6 +102,54 @@ async function submitImport() {
     }
 }
 
+/* ---- Répartition en classe ---- */
+/**
+ * Les élèves cochés, et la classe où les envoyer.
+ *
+ * <p>Rien ne permettait d'affecter un élève déjà inscrit : la classe se choisissait à
+ * l'inscription unitaire, et nulle part ailleurs. Un import de vingt élèves laissait donc vingt
+ * élèves sans classe, définitivement.
+ *
+ * <p>La sélection est vidée après l'affectation : les élèves affectés quittent le filtre « Sans
+ * classe », et garder cochés des identifiants que la liste n'affiche plus tromperait sur ce que
+ * la prochaine action toucherait.
+ */
+const selected = reactive(new Set<string>());
+const targetClass = ref('');
+const assigning = ref(false);
+const assignError = ref('');
+
+const allOnPageSelected = computed(() =>
+    students.value.length > 0 && students.value.every((student) => selected.has(student.id)));
+const someOnPageSelected = computed(() =>
+    students.value.some((student) => selected.has(student.id)));
+
+function toggleOne(id: string) {
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+}
+
+function toggleAll() {
+    if (allOnPageSelected.value) students.value.forEach((student) => selected.delete(student.id));
+    else students.value.forEach((student) => selected.add(student.id));
+}
+
+async function assignSelection() {
+    if (!targetClass.value || !selected.size) return;
+    assigning.value = true;
+    assignError.value = '';
+    try {
+        await assignToClass(targetClass.value, [...selected]);
+        selected.clear();
+        targetClass.value = '';
+        await load();
+    } catch (e: any) {
+        assignError.value = e?.data?.debugMessage ?? "L'affectation n'a pas pu être enregistrée.";
+    } finally {
+        assigning.value = false;
+    }
+}
+
 const showForm = ref(false);
 const saving = ref(false);
 const formError = ref('');
@@ -247,11 +295,24 @@ onMounted(async () => {
             <form @submit.prevent="submitImport">
                 <p class="text-[12.5px] mb-3 leading-relaxed" style="color: var(--text-muted)">
                     En-tête exact attendu :
-                    <code class="text-[11.5px]">matricule;nom;prenom;date_naissance;lieu_naissance;niveau</code><br />
+                    <code class="text-[11.5px]">matricule;nom;prenom;date_naissance;lieu_naissance;niveau;classe</code><br />
                     Les dates s'écrivent AAAA-MM-JJ, et le niveau doit être l'un de ceux que vous
-                    avez déclarés. L'import est tout ou rien : si une ligne est invalide, rien n'est
-                    enregistré.
+                    avez déclarés. <strong>La colonne « classe » est facultative</strong> : renseignée,
+                    l'élève y est affecté dès l'import ; laissée vide, il restera à répartir.
+                    L'import est tout ou rien : si une ligne est invalide, rien n'est enregistré.
                 </p>
+
+                <!-- Le modèle vient du serveur, qui le construit avec les constantes du contrôle
+                     d'en-tête : un modèle recopié ici aurait dérivé au premier changement de
+                     format, et l'école se serait vu refuser un fichier téléchargé chez nous. -->
+                <a
+                    href="/api/v1/students/import-csv/template"
+                    download="nelima-modele-eleves.csv" class="btn-ghost btn-sm mb-3"
+                >
+                    <BoIcon name="download" :size="15" />
+                    Télécharger le modèle
+                </a>
+
                 <input type="file" accept=".csv,text/csv" required class="block text-sm"
                        @change="onFileChange" />
                 <p v-if="importError" class="alert-danger mt-3" role="alert">{{ importError }}</p>
@@ -388,10 +449,50 @@ onMounted(async () => {
                 </label>
             </div>
 
+            <!-- La barre de répartition.
+                 Après un import, une école a des dizaines d'élèves sans classe : les affecter un
+                 par un depuis leur fiche serait la même corvée que l'import devait éviter. -->
+            <div
+                v-if="selected.size"
+                class="flex flex-wrap items-center gap-3 px-3.5 py-3 mb-3"
+                style="background: var(--brand-50); border: 1px solid var(--brand-200);
+                       border-radius: var(--radius)"
+            >
+                <span class="text-[13px] font-semibold">
+                    {{ selected.size }} élève{{ selected.size > 1 ? 's' : '' }} sélectionné{{ selected.size > 1 ? 's' : '' }}
+                </span>
+                <label class="inp">
+                    <select v-model="targetClass" aria-label="Classe de destination">
+                        <option value="">Affecter à la classe…</option>
+                        <option v-for="schoolClass in classOptions" :key="schoolClass.id" :value="schoolClass.id">
+                            {{ schoolClass.name }}
+                        </option>
+                    </select>
+                </label>
+                <button
+                    class="btn-primary btn-sm" :disabled="!targetClass || assigning"
+                    @click="assignSelection"
+                >
+                    {{ assigning ? 'Affectation…' : 'Affecter' }}
+                </button>
+                <button class="btn-ghost btn-sm" @click="selected.clear()">Annuler</button>
+                <span v-if="assignError" class="text-[12.5px]" style="color: var(--danger)">
+                    {{ assignError }}
+                </span>
+            </div>
+
             <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
                 <table class="table">
                     <thead>
                         <tr>
+                            <th style="width: 1%">
+                                <input
+                                    type="checkbox" aria-label="Tout sélectionner"
+                                    :checked="allOnPageSelected"
+                                    :indeterminate.prop="someOnPageSelected && !allOnPageSelected"
+                                    @change="toggleAll"
+                                />
+                            </th>
                             <th>Élève</th>
                             <th>Matricule</th>
                             <th>Niveau</th>
@@ -402,11 +503,19 @@ onMounted(async () => {
                         </tr>
                     </thead>
                     <tbody>
-                        <TableSkeleton v-if="loading" :columns="7" />
+                        <TableSkeleton v-if="loading" :columns="8" />
                         <tr
                             v-for="student in students" v-else :key="student.id"
                             class="cl" @click="opened = student"
                         >
+                            <!-- `@click.stop` : cocher une case ne doit pas ouvrir la fiche. -->
+                            <td @click.stop>
+                                <input
+                                    type="checkbox" :aria-label="`Sélectionner ${student.lastName}`"
+                                    :checked="selected.has(student.id)"
+                                    @change="toggleOne(student.id)"
+                                />
+                            </td>
                             <td>
                                 <div class="flex items-center gap-2.5">
                                     <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="28" />
