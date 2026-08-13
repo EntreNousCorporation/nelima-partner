@@ -220,8 +220,31 @@ function toggleLevel(code: string) {
     else form.levelOfStudiesCodes.splice(i, 1);
 }
 
+/* ---- Recherche et filtre ---- */
+/**
+ * Filtré à l'écran, sans aller-retour : la liste entière est déjà chargée, et une école compte des
+ * frais par dizaines, pas par milliers. Interroger le serveur à chaque lettre coûterait une attente
+ * pour un résultat qu'on a déjà sous la main.
+ */
+const keyword = ref('');
+const selectedLevel = ref('');
+
+const filtered = computed(() => {
+    const q = keyword.value.trim().toLowerCase();
+    return fees.value.filter((fee) => {
+        // Un frais sans niveau ne répond à aucun filtre de niveau : le montrer quand même
+        // laisserait croire qu'il s'applique au niveau demandé.
+        if (selectedLevel.value
+            && !(fee.levelOfStudies ?? []).some((level) => level.code === selectedLevel.value)) {
+            return false;
+        }
+        return !q || fee.name.toLowerCase().includes(q);
+    });
+});
+
+/** Le total suit le filtre : afficher la somme de tous les frais sous une liste filtrée mentirait. */
 const totalExpected = computed(() =>
-    fees.value.reduce((sum, f) => sum + Number(f.price ?? 0), 0));
+    filtered.value.reduce((sum, f) => sum + Number(f.price ?? 0), 0));
 
 onMounted(async () => {
     try {
@@ -315,6 +338,25 @@ onMounted(async () => {
                 title="Frais de l'établissement"
                 sub="Cliquez sur une ligne pour voir la répartition en tranches"
             >
+                <div class="tbar">
+                    <label class="inp" style="flex: 0 1 260px">
+                        <BoIcon name="search" :size="15" />
+                        <input
+                            v-model="keyword" type="search" class="w-full"
+                            placeholder="Nom du frais…" aria-label="Rechercher un frais"
+                        />
+                    </label>
+
+                    <label class="inp">
+                        <select v-model="selectedLevel" aria-label="Filtrer par niveau">
+                            <option value="">Tous les niveaux</option>
+                            <option v-for="level in levelOptions" :key="level.id" :value="level.code">
+                                {{ levelLabel(level) }}
+                            </option>
+                        </select>
+                    </label>
+                </div>
+
                 <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
                     <table class="table">
                         <thead>
@@ -329,7 +371,7 @@ onMounted(async () => {
                         <tbody>
                             <TableSkeleton v-if="loading" :columns="5" />
                             <tr
-                                v-for="fee in fees" v-else :key="fee.id" class="cursor-pointer"
+                                v-for="fee in filtered" v-else :key="fee.id" class="cursor-pointer"
                                 :style="selected?.id === fee.id ? 'background: var(--brand-50)' : ''"
                                 @click="select(fee)"
                             >
@@ -374,15 +416,20 @@ onMounted(async () => {
                 </div>
 
                 <EmptyState
-                    v-if="!loading && !fees.length"
+                    v-if="!loading && fees.length && !filtered.length"
+                    title="Aucun résultat"
+                    text="Aucun frais ne correspond à cette recherche."
+                />
+                <EmptyState
+                    v-else-if="!loading && !fees.length"
                     title="Aucun frais défini"
                     text="Créez vos frais de scolarité, de cantine ou de transport, puis répartissez-les en tranches datées."
                 />
 
                 <template #footer>
                     <span class="text-[12px]" style="color: var(--text-faint)">
-                        <b class="nu" style="color: var(--navy)">{{ fees.length }}</b>
-                        frais · <b class="nu" style="color: var(--navy)">{{ formatAmount(totalExpected) }}</b>
+                        <b class="nu" style="color: var(--navy)">{{ filtered.length }}</b>
+                        frais<span v-if="filtered.length !== fees.length"> sur {{ fees.length }}</span> · <b class="nu" style="color: var(--navy)">{{ formatAmount(totalExpected) }}</b>
                         par élève concerné, tous frais cumulés
                     </span>
                 </template>
