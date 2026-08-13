@@ -281,6 +281,15 @@ onMounted(async () => {
                 ? 'Le montant ne modifie pas les tranches déjà créées : elles portent le leur.'
                 : 'Montant total, avant découpage en tranches'"
         >
+            <!-- Dit avant l'acte, et non après le refus : retirer un niveau supprime la dette de
+                 ses élèves sur ce frais, et cela ne se devine pas d'une case décochée. -->
+            <p
+                v-if="editingFee" class="text-[12.5px] mb-3.5"
+                style="color: var(--warning)"
+            >
+                Retirer un niveau supprime ce frais — et ses tranches non réglées — pour les élèves
+                qui y sont. C'est refusé si un règlement a déjà été encaissé.
+            </p>
             <form @submit.prevent="submit">
                 <p v-if="!levelOptions.length" class="alert-danger mb-4">
                     Aucun niveau déclaré. Renseignez d'abord

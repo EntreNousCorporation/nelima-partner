@@ -98,6 +98,7 @@ export type NotificationPreference = {
 export type AuditAction =
     | 'PAYMENT_COLLECTED'
     | 'FEE_SCHEDULE_DEFINED'
+    | 'FEE_LEVEL_DETACHED'
     | 'ACCOUNTING_EXPORTED'
     | 'REMINDER_CAMPAIGN_SENT'
     | 'PORTAL_ACCESS_GRANTED'
@@ -127,6 +128,7 @@ export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = 
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     PAYMENT_COLLECTED: 'Encaissement au guichet',
+    FEE_LEVEL_DETACHED: 'Niveau retiré d\'un frais',
     FEE_SCHEDULE_DEFINED: 'Échéancier redéfini',
     ACCOUNTING_EXPORTED: 'Export comptable',
     REMINDER_CAMPAIGN_SENT: 'Campagne de relance',
