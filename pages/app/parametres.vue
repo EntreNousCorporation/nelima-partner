@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
     NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_EVENT_LABELS,
-    auditActionLabel, contactOf,
+    auditActionLabel, primaryContact,
     type AcademicYear, type AuditEvent, type Establishment, type NotificationChannel,
     type NotificationEvent, type NotificationPreference,
 } from '~/composables/useSettings';
@@ -64,6 +64,7 @@ function done(message: string) {
 const establishment = ref<Establishment | null>(null);
 const identity = reactive({
     name: '', shortName: '', accreditationNumber: '', webSite: '', addressName: '',
+    phone: '', email: '',
 });
 const savingIdentity = ref(false);
 
@@ -79,10 +80,48 @@ async function loadEstablishment() {
             accreditationNumber: data.accreditationNumber ?? '',
             webSite: data.webSite ?? '',
             addressName: data.address?.name ?? '',
+            phone: primaryContact(data, 'PHONE_NUMBER')?.value ?? '',
+            email: primaryContact(data, 'EMAIL')?.value ?? '',
         });
     } catch (e) {
         fail(e, "La fiche de l'établissement n'a pas pu être chargée.");
     }
+}
+
+/**
+ * Les contacts à écrire, avec l'`id` de l'existant quand il y en a un.
+ *
+ * <p>Sans cet `id`, chaque enregistrement créerait un contact de plus au lieu de corriger celui
+ * qui est là, et la contrainte d'unicité applicative finirait par refuser la fiche. Un champ vidé
+ * n'est pas envoyé : effacer un contact se fait ailleurs, et le confondre avec « ne rien changer »
+ * ferait disparaître un numéro sur une simple faute de frappe.
+ *
+ * <p>Le drapeau « principal » n'est <strong>jamais posé sur les deux</strong> : un établissement
+ * n'a qu'un seul contact principal, tous types confondus, et le serveur refuse la fiche entière
+ * sinon. On conserve donc celui qui l'est déjà ; à défaut, le premier renseigné le devient.
+ */
+function contactsPayload() {
+    const existingPrimaryId = (establishment.value?.contacts ?? [])
+        .find((contact) => contact.isPrimary)?.id;
+
+    const wanted: { id?: string; type: 'EMAIL' | 'PHONE_NUMBER'; value: string; isPrimary: boolean }[] = [];
+    for (const [type, value] of [
+        ['PHONE_NUMBER', identity.phone] as const,
+        ['EMAIL', identity.email] as const,
+    ]) {
+        const trimmed = (value ?? '').trim();
+        if (!trimmed) continue;
+        const existing = primaryContact(establishment.value, type);
+        wanted.push({
+            id: existing?.id,
+            type,
+            value: trimmed,
+            isPrimary: existingPrimaryId
+                ? existing?.id === existingPrimaryId
+                : wanted.length === 0,
+        });
+    }
+    return wanted.length ? wanted : undefined;
 }
 
 async function submitIdentity() {
@@ -94,6 +133,7 @@ async function submitIdentity() {
             accreditationNumber: identity.accreditationNumber || undefined,
             webSite: identity.webSite || undefined,
             addressName: identity.addressName || undefined,
+            contacts: contactsPayload(),
         });
         await loadEstablishment();
         done('Identité enregistrée.');
@@ -431,19 +471,31 @@ onMounted(async () => {
                     </UiCard>
 
                     <UiCard title="Contacts">
+                        <!-- Modifiables ici : ce sont les coordonnées de l'établissement, pas
+                             celles de son compte de direction, et l'école est la mieux placée
+                             pour les tenir à jour. Enregistrées avec le formulaire d'identité
+                             ci-dessus, dont elles font partie côté serveur. -->
                         <div class="grid gap-3.5 sm:grid-cols-2">
                             <div>
-                                <span class="field-label">Téléphone</span>
-                                <p class="text-[13px]">{{ contactOf(establishment, 'PHONE_NUMBER') ?? '—' }}</p>
+                                <label class="field-label" for="schoolPhone">Téléphone</label>
+                                <input
+                                    id="schoolPhone" v-model="identity.phone" type="tel"
+                                    placeholder="+225 07 00 00 00 00" class="input"
+                                    :disabled="!canWrite"
+                                />
                             </div>
                             <div>
-                                <span class="field-label">E-mail</span>
-                                <p class="text-[13px]">{{ contactOf(establishment, 'EMAIL') ?? '—' }}</p>
+                                <label class="field-label" for="schoolEmail">E-mail</label>
+                                <input
+                                    id="schoolEmail" v-model="identity.email" type="email"
+                                    placeholder="contact@votre-ecole.ci" class="input"
+                                    :disabled="!canWrite"
+                                />
                             </div>
                         </div>
                         <p class="hint mt-3">
-                            Les contacts servent à joindre l'établissement et se modifient depuis
-                            la fiche du compte principal.
+                            Ces coordonnées servent aux familles pour joindre l'établissement, et
+                            figurent sur les reçus. Elles s'enregistrent avec l'identité ci-dessus.
                         </p>
                     </UiCard>
                 </template>

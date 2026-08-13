@@ -40,6 +40,9 @@ type ClassFilling = {
 type Summary = {
     studentCount: number;
     levelCount: number;
+    girlCount: number;
+    boyCount: number;
+    genderUnknownCount: number;
     collectedThisMonth: number;
     receiptsThisMonth: number;
     collectedToday: number;
@@ -158,6 +161,10 @@ const steps = computed(() => [
 ]);
 
 const stepsDone = computed(() => steps.value.filter((step) => step.done).length);
+
+/** Effectif dont le sexe est connu : en deçà de un, la répartition n'a rien à dire. */
+const genderKnown = computed(() =>
+    (summary.value?.girlCount ?? 0) + (summary.value?.boyCount ?? 0));
 
 const collected = computed(() => compact(summary.value?.collectedThisMonth));
 const outstanding = computed(() => compact(summary.value?.overdueAmount));
@@ -581,6 +588,27 @@ onMounted(loadExtras);
                     <template #action>
                         <NuxtLink to="/app/classes" class="btn-secondary btn-sm">Gérer</NuxtLink>
                     </template>
+
+                    <!-- Répartition filles/garçons : les états scolaires la demandent.
+                         Le reste à renseigner est dit, sans quoi « 12 filles, 9 garçons » sur un
+                         effectif de trente se lirait comme un total. -->
+                    <div
+                        v-if="genderKnown > 0"
+                        class="flex items-center gap-4 mb-4 pb-3.5 text-[12.5px]"
+                        style="border-bottom: 1px dashed var(--border-strong)"
+                    >
+                        <span>
+                            <b class="nu" style="color: var(--navy)">{{ summary?.girlCount ?? 0 }}</b>
+                            fille{{ (summary?.girlCount ?? 0) > 1 ? 's' : '' }}
+                        </span>
+                        <span>
+                            <b class="nu" style="color: var(--navy)">{{ summary?.boyCount ?? 0 }}</b>
+                            garçon{{ (summary?.boyCount ?? 0) > 1 ? 's' : '' }}
+                        </span>
+                        <span v-if="(summary?.genderUnknownCount ?? 0) > 0" style="color: var(--text-faint)">
+                            {{ summary?.genderUnknownCount }} à renseigner
+                        </span>
+                    </div>
 
                     <div v-if="summary?.classFilling?.length" class="flex flex-col gap-3">
                         <div v-for="klass in summary.classFilling.slice(0, 6)" :key="klass.id">

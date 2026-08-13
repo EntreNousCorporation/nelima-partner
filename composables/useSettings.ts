@@ -28,7 +28,10 @@ export type Establishment = {
 /**
  * Modification partielle : les champs omis gardent leur valeur.
  *
- * On n'envoie donc ni `isPrimary` ni les contacts, dont cet écran n'a rien à dire.
+ * <p>Les contacts s'écrivent en revanche <strong>en entier</strong>, et avec leur `id` : c'est lui
+ * qui distingue une mise à jour d'une création, la contrainte d'unicité applicative refusant le
+ * doublon. Ils étaient jusqu'ici en lecture seule dans le portail — l'école lisait ses propres
+ * coordonnées sans pouvoir les corriger, alors que le back-office, lui, les modifiait.
  */
 export type EstablishmentUpdateForm = {
     name: string;
@@ -36,7 +39,14 @@ export type EstablishmentUpdateForm = {
     accreditationNumber?: string;
     webSite?: string;
     addressName?: string;
+    contacts?: { id?: string; type: 'EMAIL' | 'PHONE_NUMBER'; value: string; isPrimary?: boolean }[];
 };
+
+/** Le contact principal d'un type, tel qu'il est enregistré — `id` compris. */
+export function primaryContact(establishment: Establishment | null, type: 'EMAIL' | 'PHONE_NUMBER') {
+    const matching = (establishment?.contacts ?? []).filter((contact) => contact.type === type);
+    return matching.find((contact) => contact.isPrimary) ?? matching[0];
+}
 
 /** Premier contact du type demandé, le principal d'abord. */
 export function contactOf(establishment: Establishment | null, type: 'EMAIL' | 'PHONE_NUMBER') {

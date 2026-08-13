@@ -41,6 +41,15 @@ export type Guardian = {
     contacts?: GuardianContact[];
 };
 
+export type Gender = 'MALE' | 'FEMALE';
+
+/** Ce que l'école lit, plutôt que l'énuméré du serveur. */
+export function genderLabel(gender?: Gender | null) {
+    if (gender === 'FEMALE') return 'Fille';
+    if (gender === 'MALE') return 'Garçon';
+    return 'Non renseigné';
+}
+
 export type Student = {
     id: string;
     firstName: string;
@@ -48,6 +57,8 @@ export type Student = {
     registrationNumber: string;
     birthDay: string;
     placeOfBirth?: string;
+    /** Nul tant que l'école ne l'a pas renseigné : la donnée est facultative. */
+    gender?: Gender;
     levelOfStudy?: LevelOfStudy;
     schoolClass?: { id: string; name: string; room?: string };
     /** Servi sur la liste : ce que la famille doit encore, et la part déjà échue. */
@@ -124,9 +135,29 @@ export function useStudents() {
         birthDay: string;
         placeOfBirth: string;
         levelOfStudyCode: string;
+        gender?: Gender;
     }) {
         return api<Student>('/students', { method: 'POST', body: payload });
     }
 
-    return { search, catalogue, establishmentLevels, create };
+    /**
+     * Modifie la fiche d'un élève. Seuls les champs fournis sont écrits.
+     *
+     * <p>La route n'était exposée nulle part côté serveur : une fiche ne se corrigeait pas une
+     * fois créée. C'est par elle qu'une école complète les élèves inscrits avant que le sexe ne
+     * soit demandé.
+     */
+    function update(id: string, payload: Partial<{
+        firstName: string;
+        lastName: string;
+        registrationNumber: string;
+        birthDay: string;
+        placeOfBirth: string;
+        levelOfStudyCode: string;
+        gender: Gender;
+    }>) {
+        return api<Student>(`/students/${id}`, { method: 'PUT', body: payload });
+    }
+
+    return { search, catalogue, establishmentLevels, create, update };
 }

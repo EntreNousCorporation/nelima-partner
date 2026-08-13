@@ -95,6 +95,17 @@ const byCycle = computed(() => {
 /** Des classes sans cycle existent : la puce de filtre correspondante n'a de sens que dans ce cas. */
 const hasOrphans = computed(() => rows.value.some((row) => !row.cycle));
 
+/**
+ * Les enseignants rattachés à la classe, titulaire mis à part.
+ *
+ * <p>Le titulaire figure déjà sur sa ligne ; le répéter en dessous ferait croire à deux personnes.
+ * Les autres viennent de Personnel → Affectations, et c'est le seul endroit où l'école peut
+ * constater que ce rattachement a bien eu lieu.
+ */
+function otherTeachers(row: SchoolClass) {
+    return (row.teacherNames ?? []).filter((name) => name !== row.mainTeacherName);
+}
+
 function openCreate() {
     editing.value = null;
     Object.assign(form, {
@@ -370,6 +381,15 @@ onMounted(async () => {
                             <td><span class="tag">{{ row.levelLabel ?? '—' }}</span></td>
                             <td class="text-[12.5px] font-semibold" style="color: var(--text)">
                                 {{ row.mainTeacherName ?? '—' }}
+                                <!-- Les enseignants rattachés depuis Personnel : sans eux, une
+                                     école qui venait de faire ce rattachement ne voyait rien
+                                     changer ici, et concluait que l'écran ne l'avait pas pris. -->
+                                <span
+                                    v-if="otherTeachers(row).length"
+                                    class="block font-medium text-[11.5px]" style="color: var(--text-faint)"
+                                >
+                                    + {{ otherTeachers(row).join(', ') }}
+                                </span>
                             </td>
                             <td class="nu text-[12px]" style="color: var(--text-faint)">
                                 {{ row.room ?? '—' }}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { levelLabel, type LevelOfStudy, type Student } from '~/composables/useStudents';
+import { levelLabel, type Gender, type LevelOfStudy, type Student } from '~/composables/useStudents';
 
 /**
  * Statut de règlement d'un élève, déduit de son solde.
@@ -160,6 +160,7 @@ const form = reactive({
     birthDay: '',
     placeOfBirth: '',
     levelOfStudyCode: '',
+    gender: '' as Gender | '',
 });
 
 const formComplete = computed(() =>
@@ -201,7 +202,9 @@ async function submit() {
     formError.value = '';
     saving.value = true;
     try {
-        const created = await create({ ...form });
+        // `gender` vide vaut « non renseigné » : on ne l'envoie pas plutôt que d'envoyer une
+        // chaîne que le serveur refuserait de convertir en énuméré.
+        const created = await create({ ...form, gender: form.gender || undefined });
         // Inscription en une étape : si une classe est choisie, on y affecte l'élève dans la foulée,
         // au lieu d'imposer une seconde manipulation depuis le tiroir de classe.
         if (formClass.value && created?.id) {
@@ -210,7 +213,7 @@ async function submit() {
         showForm.value = false;
         Object.assign(form, {
             firstName: '', lastName: '', registrationNumber: '',
-            birthDay: '', placeOfBirth: '', levelOfStudyCode: '',
+            birthDay: '', placeOfBirth: '', levelOfStudyCode: '', gender: '',
         });
         formClass.value = '';
         // On revient en première page : l'élève créé n'est pas nécessairement sur la page courante.
@@ -361,6 +364,16 @@ onMounted(async () => {
                     <div>
                         <label class="field-label" for="placeOfBirth">Lieu de naissance</label>
                         <input id="placeOfBirth" v-model="form.placeOfBirth" type="text" required class="input" />
+                    </div>
+                    <div>
+                        <!-- Facultatif, et sans astérisque : les états scolaires le demandent, mais
+                             une inscription ne doit pas buter dessus. -->
+                        <label class="field-label" for="gender">Sexe (facultatif)</label>
+                        <select id="gender" v-model="form.gender" class="select">
+                            <option value="">Non renseigné</option>
+                            <option value="FEMALE">Fille</option>
+                            <option value="MALE">Garçon</option>
+                        </select>
                     </div>
                     <div>
                         <label class="field-label" for="formClass">Classe</label>

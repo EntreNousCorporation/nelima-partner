@@ -7,6 +7,13 @@ export type SchoolClass = {
     mainTeacherId?: string;
     /** Servi depuis la référence quand elle existe, depuis le nom hérité sinon. */
     mainTeacherName?: string;
+    /**
+     * Les enseignants rattachés à la classe depuis l'écran Personnel.
+     *
+     * <p>Distinct du titulaire : une classe n'en a qu'un, et peut compter plusieurs intervenants.
+     * Le titulaire y figure aussi — le serveur le rattache quand on le désigne.
+     */
+    teacherNames?: string[];
     levelCode?: string;
     levelLabel?: string;
     cycle?: import('~/composables/useStudents').EducationCycle;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatAmount, formatDate, channelLabel, type Installment, type Receipt } from '~/composables/useBilling';
-import { levelLabel, type Student, type Guardian } from '~/composables/useStudents';
+import { genderLabel, levelLabel, type Student, type Guardian } from '~/composables/useStudents';
 
 /**
  * Fiche élève.
@@ -12,6 +12,40 @@ const props = defineProps<{ student: Student }>();
 defineEmits<{ close: [] }>();
 
 const { installments, receipts } = useBilling();
+const { update: updateStudent } = useStudents();
+const { can } = usePermissions();
+
+/**
+ * Le sexe, renseigné depuis la fiche.
+ *
+ * <p>Tenu localement plutôt que par la propriété : la liste qui a ouvert ce tiroir ne se recharge
+ * pas à chaque enregistrement, et lire la propriété afficherait la valeur d'avant jusqu'à la
+ * fermeture — l'école croirait que rien n'a été pris.
+ */
+const canWrite = computed(() => can('student:write'));
+const gender = ref(props.student.gender ?? '');
+const savingGender = ref(false);
+const genderError = ref('');
+
+watch(() => props.student.id, () => {
+    gender.value = props.student.gender ?? '';
+    genderError.value = '';
+});
+
+async function saveGender(value: string) {
+    const previous = gender.value;
+    gender.value = value;
+    savingGender.value = true;
+    genderError.value = '';
+    try {
+        await updateStudent(props.student.id, { gender: (value || null) as any });
+    } catch (e: any) {
+        gender.value = previous;
+        genderError.value = e?.data?.debugMessage ?? "Le sexe n'a pas pu être enregistré.";
+    } finally {
+        savingGender.value = false;
+    }
+}
 
 const dues = ref<Installment[]>([]);
 const paid = ref<Receipt[]>([]);
@@ -126,6 +160,26 @@ onMounted(async () => {
             </dd>
             <dt>Naissance</dt><dd class="nu">{{ formatDate(student.birthDay) }}</dd>
             <dt>Lieu</dt><dd>{{ student.placeOfBirth || '—' }}</dd>
+            <!-- Modifiable sur place : les élèves inscrits avant que le sexe ne soit demandé
+                 doivent pouvoir être complétés sans être recréés. -->
+            <dt>Sexe</dt>
+            <dd>
+                <template v-if="canWrite">
+                    <select
+                        :value="gender" :disabled="savingGender" class="select"
+                        style="height: 30px; max-width: 190px"
+                        @change="saveGender(($event.target as HTMLSelectElement).value)"
+                    >
+                        <option value="">Non renseigné</option>
+                        <option value="FEMALE">Fille</option>
+                        <option value="MALE">Garçon</option>
+                    </select>
+                    <span v-if="genderError" class="block text-[12px]" style="color: var(--danger)">
+                        {{ genderError }}
+                    </span>
+                </template>
+                <span v-else>{{ genderLabel(student.gender) }}</span>
+            </dd>
         </dl>
 
         <p class="sec">Parents / Tuteurs</p>
