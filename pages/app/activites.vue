@@ -351,11 +351,11 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="start">Début</label>
-                        <input id="start" v-model="form.startTime" type="time" class="input" />
+                        <NelimaTimeField id="start" v-model="form.startTime" />
                     </div>
                     <div>
                         <label class="field-label" for="end">Fin</label>
-                        <input id="end" v-model="form.endTime" type="time" class="input" />
+                        <NelimaTimeField id="end" v-model="form.endTime" />
                     </div>
                     <div>
                         <label class="field-label" for="period">Période</label>

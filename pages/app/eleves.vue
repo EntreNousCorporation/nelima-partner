@@ -359,7 +359,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="birthDay">Date de naissance</label>
-                        <input id="birthDay" v-model="form.birthDay" type="date" required class="input" />
+                        <NelimaDateField id="birthDay" v-model="form.birthDay" required />
                     </div>
                     <div>
                         <label class="field-label" for="placeOfBirth">Lieu de naissance</label>
@@ -603,6 +603,11 @@ onMounted(async () => {
             </template>
         </UiCard>
 
-        <StudentDrawer v-if="opened" :student="opened" @close="opened = null" />
+        <!-- `@updated` : la fiche modifiée doit se répercuter sur la liste, qui porterait sinon
+             encore l'ancien nom. -->
+        <StudentDrawer
+            v-if="opened" :student="opened"
+            @close="opened = null" @updated="load"
+        />
     </div>
 </template>

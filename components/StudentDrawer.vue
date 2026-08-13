@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatAmount, formatDate, channelLabel, type Installment, type Receipt } from '~/composables/useBilling';
-import { genderLabel, levelLabel, type Student, type Guardian } from '~/composables/useStudents';
+import { genderLabel, levelLabel, type Gender, type LevelOfStudy, type Student, type Guardian } from '~/composables/useStudents';
+import { useAuthStore } from '~/stores/auth';
 
 /**
  * Fiche élève.
@@ -9,43 +10,95 @@ import { genderLabel, levelLabel, type Student, type Guardian } from '~/composab
  * l'ordre — ce qui reste dû d'abord, l'échéancier ensuite, les reçus déjà émis en dernier.
  */
 const props = defineProps<{ student: Student }>();
-defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; updated: [] }>();
 
 const { installments, receipts } = useBilling();
-const { update: updateStudent } = useStudents();
+const { update: updateStudent, establishmentLevels } = useStudents();
 const { can } = usePermissions();
+const auth = useAuthStore();
 
 /**
- * Le sexe, renseigné depuis la fiche.
+ * Modification de l'état civil.
  *
- * <p>Tenu localement plutôt que par la propriété : la liste qui a ouvert ce tiroir ne se recharge
- * pas à chaque enregistrement, et lire la propriété afficherait la valeur d'avant jusqu'à la
- * fermeture — l'école croirait que rien n'a été pris.
+ * <p>Le sexe se réglait par une liste déroulante posée au milieu de lignes en lecture seule : le
+ * testeur ne l'a pas trouvée, et il avait raison — rien ne disait que cette fiche était modifiable.
+ * Un bouton « Modifier » ouvre maintenant l'ensemble des champs, ce qui répond aussi à la demande
+ * plus large : corriger un prénom mal orthographié, un matricule, un niveau.
+ *
+ * <p>Les valeurs modifiées sont tenues localement après enregistrement : la liste qui a ouvert ce
+ * tiroir ne se recharge pas d'elle-même, et lire la propriété afficherait la valeur d'avant.
  */
 const canWrite = computed(() => can('student:write'));
-const gender = ref(props.student.gender ?? '');
-const savingGender = ref(false);
-const genderError = ref('');
+const editing = ref(false);
+const saving = ref(false);
+const editError = ref('');
+const levelOptions = ref<LevelOfStudy[]>([]);
 
-watch(() => props.student.id, () => {
-    gender.value = props.student.gender ?? '';
-    genderError.value = '';
+/** Ce que la fiche affiche : la propriété, ou ce qu'on vient d'enregistrer par-dessus. */
+const shown = ref<Student>({ ...props.student });
+
+const form = reactive({
+    firstName: '', lastName: '', registrationNumber: '',
+    birthDay: '', placeOfBirth: '', levelOfStudyCode: '', gender: '' as Gender | '',
 });
 
-async function saveGender(value: string) {
-    const previous = gender.value;
-    gender.value = value;
-    savingGender.value = true;
-    genderError.value = '';
+watch(() => props.student.id, () => {
+    shown.value = { ...props.student };
+    editing.value = false;
+    editError.value = '';
+});
+
+function openEdit() {
+    Object.assign(form, {
+        firstName: shown.value.firstName ?? '',
+        lastName: shown.value.lastName ?? '',
+        registrationNumber: shown.value.registrationNumber ?? '',
+        birthDay: (shown.value.birthDay ?? '').slice(0, 10),
+        placeOfBirth: shown.value.placeOfBirth ?? '',
+        levelOfStudyCode: shown.value.levelOfStudy?.code ?? '',
+        gender: shown.value.gender ?? '',
+    });
+    editError.value = '';
+    editing.value = true;
+}
+
+async function save() {
+    saving.value = true;
+    editError.value = '';
     try {
-        await updateStudent(props.student.id, { gender: (value || null) as any });
+        const updated = await updateStudent(shown.value.id, {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            registrationNumber: form.registrationNumber,
+            birthDay: form.birthDay || undefined,
+            placeOfBirth: form.placeOfBirth || undefined,
+            levelOfStudyCode: form.levelOfStudyCode || undefined,
+            // Vide vaut « non renseigné » : on n'envoie pas une chaîne que le serveur refuserait.
+            gender: (form.gender || undefined) as Gender | undefined,
+        });
+        // La réponse du serveur fait foi — le matricule qu'il rend est celui qu'il a retenu.
+        shown.value = { ...shown.value, ...updated };
+        editing.value = false;
+        // La liste derrière doit suivre : sans cela, elle porterait encore l'ancien nom.
+        emit('updated');
     } catch (e: any) {
-        gender.value = previous;
-        genderError.value = e?.data?.debugMessage ?? "Le sexe n'a pas pu être enregistré.";
+        editError.value = e?.data?.debugMessage
+            ?? (e?.response?.status === 409
+                ? 'Un élève porte déjà ce matricule dans votre établissement.'
+                : "La fiche n'a pas pu être enregistrée.");
     } finally {
-        savingGender.value = false;
+        saving.value = false;
     }
 }
+
+onMounted(async () => {
+    if (!canWrite.value) return;
+    try {
+        levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
+    } catch {
+        levelOptions.value = [];
+    }
+});
 
 const dues = ref<Installment[]>([]);
 const paid = ref<Receipt[]>([]);
@@ -114,12 +167,12 @@ onMounted(async () => {
 
 <template>
     <SideDrawer
-        :title="`${student.lastName} ${student.firstName}`"
-        :sub="`${student.registrationNumber} · ${levelLabel(student.levelOfStudy)}`"
+        :title="`${shown.lastName} ${shown.firstName}`"
+        :sub="`${shown.registrationNumber} · ${levelLabel(shown.levelOfStudy)}`"
         @close="$emit('close')"
     >
         <template #avatar>
-            <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="42" />
+            <AvatarBadge :name="`${shown.firstName} ${shown.lastName}`" :size="42" />
         </template>
 
         <div
@@ -147,40 +200,83 @@ onMounted(async () => {
             </div>
         </div>
 
-        <p class="sec">État civil</p>
-        <dl class="kv mb-5">
-            <dt>Matricule</dt><dd class="nu">{{ student.registrationNumber }}</dd>
-            <dt>Niveau</dt><dd>{{ levelLabel(student.levelOfStudy) }}</dd>
+        <div class="flex items-center justify-between">
+            <p class="sec">État civil</p>
+            <button
+                v-if="canWrite && !editing" class="btn-ghost btn-sm mb-2"
+                @click="openEdit"
+            >Modifier</button>
+        </div>
+
+        <!-- En lecture : la fiche telle qu'elle est. -->
+        <dl v-if="!editing" class="kv mb-5">
+            <dt>Matricule</dt><dd class="nu">{{ shown.registrationNumber }}</dd>
+            <dt>Niveau</dt><dd>{{ levelLabel(shown.levelOfStudy) }}</dd>
             <dt>Classe</dt>
             <dd>
-                {{ student.schoolClass?.name ?? 'Sans classe' }}
-                <span v-if="student.schoolClass?.room" style="color: var(--text-faint)">
-                    · salle {{ student.schoolClass.room }}
+                {{ shown.schoolClass?.name ?? 'Sans classe' }}
+                <span v-if="shown.schoolClass?.room" style="color: var(--text-faint)">
+                    · salle {{ shown.schoolClass.room }}
                 </span>
             </dd>
-            <dt>Naissance</dt><dd class="nu">{{ formatDate(student.birthDay) }}</dd>
-            <dt>Lieu</dt><dd>{{ student.placeOfBirth || '—' }}</dd>
-            <!-- Modifiable sur place : les élèves inscrits avant que le sexe ne soit demandé
-                 doivent pouvoir être complétés sans être recréés. -->
-            <dt>Sexe</dt>
-            <dd>
-                <template v-if="canWrite">
-                    <select
-                        :value="gender" :disabled="savingGender" class="select"
-                        style="height: 30px; max-width: 190px"
-                        @change="saveGender(($event.target as HTMLSelectElement).value)"
-                    >
+            <dt>Naissance</dt><dd class="nu">{{ formatDate(shown.birthDay) }}</dd>
+            <dt>Lieu</dt><dd>{{ shown.placeOfBirth || '—' }}</dd>
+            <dt>Sexe</dt><dd>{{ genderLabel(shown.gender) }}</dd>
+        </dl>
+
+        <!-- En modification : les mêmes champs, saisissables.
+             La classe n'y figure pas — elle se change depuis la liste des élèves, où l'on peut en
+             affecter plusieurs d'un coup, et deux chemins pour le même acte finiraient par
+             diverger. -->
+        <form v-else class="mb-5" @submit.prevent="save">
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="field-label" for="editFirstName">Prénom</label>
+                    <input id="editFirstName" v-model="form.firstName" type="text" required class="input" />
+                </div>
+                <div>
+                    <label class="field-label" for="editLastName">Nom</label>
+                    <input id="editLastName" v-model="form.lastName" type="text" required class="input" />
+                </div>
+                <div>
+                    <label class="field-label" for="editRegistration">Matricule</label>
+                    <input id="editRegistration" v-model="form.registrationNumber" type="text" required class="input" />
+                </div>
+                <div>
+                    <label class="field-label" for="editBirthDay">Date de naissance</label>
+                    <NelimaDateField id="editBirthDay" v-model="form.birthDay" required />
+                </div>
+                <div>
+                    <label class="field-label" for="editPlace">Lieu de naissance</label>
+                    <input id="editPlace" v-model="form.placeOfBirth" type="text" class="input" />
+                </div>
+                <div>
+                    <label class="field-label" for="editLevel">Niveau</label>
+                    <select id="editLevel" v-model="form.levelOfStudyCode" required class="select">
+                        <option v-for="level in levelOptions" :key="level.id" :value="level.code">
+                            {{ levelLabel(level) }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label" for="editGender">Sexe</label>
+                    <select id="editGender" v-model="form.gender" class="select">
                         <option value="">Non renseigné</option>
                         <option value="FEMALE">Fille</option>
                         <option value="MALE">Garçon</option>
                     </select>
-                    <span v-if="genderError" class="block text-[12px]" style="color: var(--danger)">
-                        {{ genderError }}
-                    </span>
-                </template>
-                <span v-else>{{ genderLabel(student.gender) }}</span>
-            </dd>
-        </dl>
+                </div>
+            </div>
+
+            <p v-if="editError" class="alert-danger mt-3" role="alert">{{ editError }}</p>
+
+            <div class="flex gap-2 mt-3.5">
+                <button type="submit" class="btn-primary btn-sm" :disabled="saving">
+                    {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+                </button>
+                <button type="button" class="btn-ghost btn-sm" @click="editing = false">Annuler</button>
+            </div>
+        </form>
 
         <p class="sec">Parents / Tuteurs</p>
         <div

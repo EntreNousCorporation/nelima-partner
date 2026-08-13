@@ -574,17 +574,12 @@ onMounted(async () => {
                                 </div>
                                 <div>
                                     <label class="field-label" for="yearStart">Début</label>
-                                    <input
-                                        id="yearStart" v-model="yearForm.startDate" type="date"
-                                        required class="input"
-                                    />
+                                    <NelimaDateField id="yearStart" v-model="yearForm.startDate"
+                                        required />
                                 </div>
                                 <div>
                                     <label class="field-label" for="yearEnd">Fin</label>
-                                    <input
-                                        id="yearEnd" v-model="yearForm.endDate" type="date" required
-                                        class="input"
-                                    />
+                                    <NelimaDateField id="yearEnd" v-model="yearForm.endDate" required />
                                 </div>
                             </div>
 
@@ -615,11 +610,11 @@ onMounted(async () => {
                                 </div>
                                 <div>
                                     <label class="field-label">Début</label>
-                                    <input v-model="period.startDate" type="date" required class="input" />
+                                    <NelimaDateField v-model="period.startDate" required />
                                 </div>
                                 <div>
                                     <label class="field-label">Fin</label>
-                                    <input v-model="period.endDate" type="date" required class="input" />
+                                    <NelimaDateField v-model="period.endDate" required />
                                 </div>
                                 <button
                                     type="button" class="btn-ghost btn-sm" @click="removePeriod(index)"
@@ -765,16 +760,11 @@ onMounted(async () => {
                         <div class="grid gap-3.5 sm:grid-cols-4 items-end">
                             <div>
                                 <label class="field-label" for="auditFrom">Du</label>
-                                <input
-                                    id="auditFrom" v-model="auditFilters.from" type="date"
-                                    class="input"
-                                />
+                                <NelimaDateField id="auditFrom" v-model="auditFilters.from" />
                             </div>
                             <div>
                                 <label class="field-label" for="auditTo">Au</label>
-                                <input
-                                    id="auditTo" v-model="auditFilters.to" type="date" class="input"
-                                />
+                                <NelimaDateField id="auditTo" v-model="auditFilters.to" />
                             </div>
                             <div>
                                 <label class="field-label" for="auditActor">Auteur</label>

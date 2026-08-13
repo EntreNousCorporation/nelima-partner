@@ -172,10 +172,22 @@ async function submit() {
             classIds: form.wholeSchool ? [] : form.classIds,
             visibleToFamilies: form.visibleToFamilies,
         };
-        if (editing.value) await update(editing.value.id, body);
-        else await create(body);
+        const saved = editing.value
+            ? await update(editing.value.id, body)
+            : await create(body);
         showForm.value = false;
         await load();
+
+        // La fiche s'ouvre sur l'événement qu'on vient de créer.
+        //
+        // Créer ne prévient personne — c'est la direction qui décide qu'un événement mérite
+        // d'interrompre un parent —, et le formulaire le disait déjà en toutes lettres. Un
+        // testeur l'a pourtant manqué et a attendu une notification qui ne venait pas. Atterrir
+        // sur la fiche met « Prévenir les familles » sous les yeux, à l'instant où la question se
+        // pose.
+        if (!editing.value) {
+            opened.value = entries.value.find((entry) => entry.id === saved?.id) ?? null;
+        }
     } catch (e: any) {
         formError.value = e?.data?.debugMessage ?? "L'événement n'a pas pu être enregistré.";
     } finally {
@@ -270,15 +282,15 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="date">Date</label>
-                        <input id="date" v-model="form.date" type="date" required class="input" />
+                        <NelimaDateField id="date" v-model="form.date" required />
                     </div>
                     <div v-if="!form.allDay">
                         <label class="field-label" for="start">Début</label>
-                        <input id="start" v-model="form.startTime" type="time" class="input" />
+                        <NelimaTimeField id="start" v-model="form.startTime" />
                     </div>
                     <div v-if="!form.allDay">
                         <label class="field-label" for="end">Fin</label>
-                        <input id="end" v-model="form.endTime" type="time" class="input" />
+                        <NelimaTimeField id="end" v-model="form.endTime" />
                     </div>
                     <div class="sm:col-span-2">
                         <label class="field-label" for="details">Précision</label>

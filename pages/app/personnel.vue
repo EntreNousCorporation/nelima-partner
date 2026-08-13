@@ -412,7 +412,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <label class="field-label" for="hiredAt">Embauché le</label>
-                        <input id="hiredAt" v-model="form.hiredAt" type="date" class="input" />
+                        <NelimaDateField id="hiredAt" v-model="form.hiredAt" />
                     </div>
                     <div>
                         <label class="field-label" for="hours">Heures / semaine</label>
@@ -684,7 +684,7 @@ onMounted(async () => {
                 <div class="tbar">
                     <label class="inp" style="flex: 0 0 auto">
                         <span class="text-[12.5px]" style="color: var(--text-faint)">Journée</span>
-                        <input v-model="day" type="date" :max="today" aria-label="Journée pointée" />
+                        <NelimaDateField v-model="day" :max="today" aria-label="Journée pointée" />
                     </label>
 
                     <div class="flex items-center gap-2 flex-wrap text-[12.5px]" style="color: var(--text-muted)">

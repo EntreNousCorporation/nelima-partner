@@ -503,7 +503,7 @@ onMounted(async () => {
                             v-model="schedule.amount" type="number" min="1" class="input text-right"
                             aria-label="Montant"
                         />
-                        <input v-model="schedule.dueDate" type="date" class="input" aria-label="Échéance" />
+                        <NelimaDateField v-model="schedule.dueDate" aria-label="Échéance" />
                         <button
                             type="button" class="text-[12px] underline col-span-3 text-left"
                             style="color: var(--text-faint)" @click="removeSchedule(index)"

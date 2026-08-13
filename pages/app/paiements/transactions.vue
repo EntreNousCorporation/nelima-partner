@@ -115,11 +115,11 @@ onMounted(load);
             <div class="tbar">
                 <label class="inp" style="flex: 0 0 auto">
                     <span class="text-[12.5px]" style="color: var(--text-faint)">Du</span>
-                    <input v-model="from" type="date" aria-label="Début de période" />
+                    <NelimaDateField v-model="from" aria-label="Début de période" />
                 </label>
                 <label class="inp" style="flex: 0 0 auto">
                     <span class="text-[12.5px]" style="color: var(--text-faint)">au</span>
-                    <input v-model="to" type="date" aria-label="Fin de période" />
+                    <NelimaDateField v-model="to" aria-label="Fin de période" />
                 </label>
 
                 <label class="inp">
