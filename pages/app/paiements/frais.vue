@@ -31,6 +31,14 @@ const error = ref('');
 const showForm = ref(false);
 const saving = ref(false);
 const formError = ref('');
+
+/**
+ * Frais en cours de modification ; nul quand le formulaire sert à en créer un.
+ *
+ * <p>Un frais créé au mauvais montant ou sur le mauvais niveau ne se rattrapait qu'en le
+ * supprimant — et le supprimer emporte la dette des familles qui le portent déjà.
+ */
+const editingFee = ref<Fee | null>(null);
 const form = reactive({
     name: '',
     price: '' as string | number,
@@ -89,27 +97,56 @@ async function load() {
     }
 }
 
+function openCreate() {
+    editingFee.value = null;
+    Object.assign(form, { name: '', price: '', optional: false, academical: true, levelOfStudiesCodes: [] });
+    formError.value = '';
+    showForm.value = true;
+}
+
+function openEdit(fee: Fee) {
+    editingFee.value = fee;
+    Object.assign(form, {
+        name: fee.name,
+        price: fee.price,
+        optional: fee.optional,
+        academical: fee.academical,
+        levelOfStudiesCodes: (fee.levelOfStudies ?? []).map((level) => level.code),
+    });
+    formError.value = '';
+    showForm.value = true;
+    if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeForm() {
+    showForm.value = false;
+    editingFee.value = null;
+    formError.value = '';
+}
+
 async function submit() {
     formError.value = '';
     saving.value = true;
     try {
-        await api('/fees', {
-            method: 'POST',
-            body: {
-                name: form.name,
-                price: Number(form.price),
-                optional: form.optional,
-                academical: form.academical,
-                levelOfStudiesCodes: form.levelOfStudiesCodes,
-            },
-        });
-        showForm.value = false;
+        const body = {
+            name: form.name,
+            price: Number(form.price),
+            optional: form.optional,
+            academical: form.academical,
+            levelOfStudiesCodes: form.levelOfStudiesCodes,
+        };
+        if (editingFee.value) await api(`/fees/${editingFee.value.id}`, { method: 'PUT', body });
+        else await api('/fees', { method: 'POST', body });
+        closeForm();
         Object.assign(form, { name: '', price: '', optional: false, academical: true, levelOfStudiesCodes: [] });
         await load();
     } catch (e: any) {
-        formError.value = e?.response?.status === 409
-            ? 'Un frais porte déjà ce nom dans votre établissement.'
-            : "Le frais n'a pas pu être enregistré.";
+        // Le serveur refuse de retirer un niveau dont les élèves ont déjà un échéancier, et son
+        // message dit quoi faire : le montrer tel quel vaut mieux que « une erreur est survenue ».
+        formError.value = e?.data?.debugMessage
+            ?? (e?.response?.status === 409
+                ? 'Un frais porte déjà ce nom dans votre établissement.'
+                : "Le frais n'a pas pu être enregistré.");
     } finally {
         saving.value = false;
     }
@@ -203,7 +240,7 @@ onMounted(async () => {
             sub="Définis par niveau, appliqués automatiquement aux élèves concernés"
         >
             <template #actions>
-                <button class="btn-primary" @click="showForm = !showForm">
+                <button class="btn-primary" @click="showForm ? closeForm() : openCreate()">
                     <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
                     {{ showForm ? 'Annuler' : 'Nouveau frais' }}
                 </button>
@@ -214,7 +251,13 @@ onMounted(async () => {
 
         <p v-if="error" class="alert-danger mb-3.5" role="alert">{{ error }}</p>
 
-        <UiCard v-if="showForm" class="mb-3.5" title="Nouveau frais" sub="Montant total, avant découpage en tranches">
+        <UiCard
+            v-if="showForm" class="mb-3.5"
+            :title="editingFee ? `Modifier « ${editingFee.name} »` : 'Nouveau frais'"
+            :sub="editingFee
+                ? 'Le montant ne modifie pas les tranches déjà créées : elles portent le leur.'
+                : 'Montant total, avant découpage en tranches'"
+        >
             <form @submit.prevent="submit">
                 <p v-if="!levelOptions.length" class="alert-danger mb-4">
                     Aucun niveau déclaré. Renseignez d'abord
@@ -280,10 +323,11 @@ onMounted(async () => {
                                 <th>Niveaux</th>
                                 <th class="text-right">Montant total</th>
                                 <th>Échéancier</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <TableSkeleton v-if="loading" :columns="4" />
+                            <TableSkeleton v-if="loading" :columns="5" />
                             <tr
                                 v-for="fee in fees" v-else :key="fee.id" class="cursor-pointer"
                                 :style="selected?.id === fee.id ? 'background: var(--brand-50)' : ''"
@@ -316,6 +360,13 @@ onMounted(async () => {
                                             ? `${scheduleCounts[fee.id]} tranche${scheduleCounts[fee.id] > 1 ? 's' : ''}`
                                             : 'À découper' }}
                                     </UiPill>
+                                </td>
+                                <!-- `@click.stop` : modifier un frais ne doit pas en même temps
+                                     ouvrir son échéancier dans la colonne de droite. -->
+                                <td class="text-right" @click.stop>
+                                    <button class="btn-ghost btn-sm" @click="openEdit(fee)">
+                                        Modifier
+                                    </button>
                                 </td>
                             </tr>
                         </tbody>
