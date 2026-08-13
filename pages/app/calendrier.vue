@@ -262,7 +262,7 @@ onMounted(async () => {
         <UiCard
             v-if="showForm" class="mb-3.5"
             :title="editing ? `Modifier ${editing.title}` : 'Nouvel événement'"
-            sub="Rendre un événement visible des familles ne les prévient pas : l'envoi se fait depuis sa fiche"
+            sub="En deux temps : l'afficher aux familles, puis les prévenir depuis sa fiche"
         >
             <form @submit.prevent="submit">
                 <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -310,12 +310,23 @@ onMounted(async () => {
                         <input v-model="form.wholeSchool" type="checkbox" />
                         Tout l'établissement
                     </label>
+                    <!-- Deux actes distincts, énoncés dans l'ordre où ils se font.
+                         La formulation précédente — « Visible des familles (n'envoie aucune
+                         notification) » — disait ce qui n'arrive pas sans dire quoi faire ensuite,
+                         et empilait deux négations. -->
                     <label class="flex items-center gap-2 text-[12.5px]">
                         <input v-model="form.visibleToFamilies" type="checkbox" />
-                        Visible des familles
-                        <span style="color: var(--text-faint)">(n'envoie aucune notification)</span>
+                        Afficher dans l'application des familles
                     </label>
                 </div>
+
+                <p
+                    v-if="form.visibleToFamilies" class="mt-2 text-[12px]"
+                    style="color: var(--text-muted)"
+                >
+                    Il apparaîtra dans leur application. Pour les prévenir par notification,
+                    ouvrez sa fiche après enregistrement : c'est vous qui choisissez le moment.
+                </p>
 
                 <template v-if="!form.wholeSchool">
                     <p class="sec mt-4">Classes concernées</p>

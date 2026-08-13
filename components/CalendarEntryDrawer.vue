@@ -37,7 +37,7 @@ const timeLabel = computed(() => {
 });
 
 const notifiedLabel = computed(() => {
-    if (!props.entry.lastNotifiedAt) return 'Aucune notification envoyée';
+    if (!props.entry.lastNotifiedAt) return "Les familles n'ont pas encore été prévenues";
     return `Dernier envoi le ${new Date(props.entry.lastNotifiedAt).toLocaleDateString('fr-FR')}`;
 });
 </script>
@@ -122,12 +122,12 @@ const notifiedLabel = computed(() => {
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <b class="block text-[12.5px]" style="color: var(--navy)">
-                            {{ entry.visibleToFamilies ? 'Visible des familles' : 'Événement interne' }}
+                            {{ entry.visibleToFamilies ? 'Affiché aux familles' : 'Événement interne' }}
                         </b>
                         <span class="text-[11.5px]" style="color: var(--text-faint)">
                             {{ entry.visibleToFamilies
                                 ? notifiedLabel
-                                : "L'application des familles ne l'affiche pas" }}
+                                : "Visible de l'école seulement" }}
                         </span>
                     </div>
                     <button
