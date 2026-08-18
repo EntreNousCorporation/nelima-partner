@@ -403,11 +403,17 @@ onMounted(async () => {
             <div class="flex flex-col gap-3.5 min-w-0">
                 <!-- ================= Établissement ================= -->
                 <template v-if="current === 'etab'">
-                    <UiCard
-                        title="Identité de l'établissement"
-                        sub="Ces informations figurent sur les reçus envoyés aux familles"
-                    >
-                        <form @submit.prevent="submitIdentity">
+                    <!-- Un seul formulaire pour les deux cartes.
+
+                         Les contacts sont enregistrés par la même route que l'identité, mais
+                         vivaient hors du formulaire : le bouton tombait donc au milieu de l'écran,
+                         au-dessus de champs qu'il enregistre pourtant. On voyait « Enregistrer »,
+                         puis deux champs de plus, et rien pour les valider. -->
+                    <form class="contents" @submit.prevent="submitIdentity">
+                        <UiCard
+                            title="Identité de l'établissement"
+                            sub="Ces informations figurent sur les reçus envoyés aux familles"
+                        >
                             <div class="grid gap-3.5 sm:grid-cols-2">
                                 <div>
                                     <label class="field-label" for="name">Nom de l'établissement</label>
@@ -461,43 +467,45 @@ onMounted(async () => {
                                 </div>
                             </div>
 
+                        </UiCard>
+
+                        <UiCard title="Contacts">
+                            <!-- Modifiables ici : ce sont les coordonnées de l'établissement, pas
+                                 celles de son compte de direction, et l'école est la mieux placée
+                                 pour les tenir à jour. -->
+                            <div class="grid gap-3.5 sm:grid-cols-2">
+                                <div>
+                                    <label class="field-label" for="schoolPhone">Téléphone</label>
+                                    <input
+                                        id="schoolPhone" v-model="identity.phone" type="tel"
+                                        placeholder="+225 07 00 00 00 00" class="input"
+                                        :disabled="!canWrite"
+                                    />
+                                </div>
+                                <div>
+                                    <label class="field-label" for="schoolEmail">E-mail</label>
+                                    <input
+                                        id="schoolEmail" v-model="identity.email" type="email"
+                                        placeholder="contact@votre-ecole.ci" class="input"
+                                        :disabled="!canWrite"
+                                    />
+                                </div>
+                            </div>
+                            <p class="hint mt-3">
+                                Ces coordonnées servent aux familles pour joindre l'établissement,
+                                et figurent sur les reçus.
+                            </p>
+
+                            <!-- Le bouton clôt le formulaire, après le dernier champ qu'il
+                                 enregistre — identité et contacts partent ensemble. -->
                             <div v-if="canWrite" class="flex gap-2 mt-4">
                                 <button type="submit" class="btn-primary" :disabled="savingIdentity">
                                     <BoIcon name="check" :size="16" />
                                     {{ savingIdentity ? 'Enregistrement…' : 'Enregistrer' }}
                                 </button>
                             </div>
-                        </form>
-                    </UiCard>
-
-                    <UiCard title="Contacts">
-                        <!-- Modifiables ici : ce sont les coordonnées de l'établissement, pas
-                             celles de son compte de direction, et l'école est la mieux placée
-                             pour les tenir à jour. Enregistrées avec le formulaire d'identité
-                             ci-dessus, dont elles font partie côté serveur. -->
-                        <div class="grid gap-3.5 sm:grid-cols-2">
-                            <div>
-                                <label class="field-label" for="schoolPhone">Téléphone</label>
-                                <input
-                                    id="schoolPhone" v-model="identity.phone" type="tel"
-                                    placeholder="+225 07 00 00 00 00" class="input"
-                                    :disabled="!canWrite"
-                                />
-                            </div>
-                            <div>
-                                <label class="field-label" for="schoolEmail">E-mail</label>
-                                <input
-                                    id="schoolEmail" v-model="identity.email" type="email"
-                                    placeholder="contact@votre-ecole.ci" class="input"
-                                    :disabled="!canWrite"
-                                />
-                            </div>
-                        </div>
-                        <p class="hint mt-3">
-                            Ces coordonnées servent aux familles pour joindre l'établissement, et
-                            figurent sur les reçus. Elles s'enregistrent avec l'identité ci-dessus.
-                        </p>
-                    </UiCard>
+                        </UiCard>
+                    </form>
                 </template>
 
                 <!-- ================= Niveaux enseignés ================= -->
@@ -511,7 +519,7 @@ onMounted(async () => {
                                  pas à un lecteur d'écran, et c'est toute l'information de l'écran. -->
                             <button
                                 v-for="level in levelCatalogue" :key="level.id" type="button"
-                                class="chip" :disabled="!canWrite"
+                                class="chip chip--pick" :disabled="!canWrite"
                                 :aria-pressed="levelSelection.includes(level.code)"
                                 @click="toggleLevel(level.code)"
                             >{{ levelLabel(level) }}</button>

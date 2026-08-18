@@ -807,6 +807,23 @@
         color: var(--brand-700);
     }
 
+    /* Puce de choix retenu, et non de filtre.
+
+       Le bleu de la puce pressée dit « c'est ce que je regarde en ce moment » : c'est juste pour un
+       filtre, qui ne change rien à ce qui est enregistré. Un niveau retenu, lui, est une décision —
+       il conditionne où un élève peut être inscrit et à quoi les frais se rattachent. Le vert des
+       états acquis le dit, et distingue d'un coup d'œil les deux natures de puce.
+
+       Les couleurs viennent des jetons de sens plutôt que des valeurs proposées en revue : elles en
+       sont à un cheveu en clair, et suivent le thème sombre, ce que trois hexadécimaux écrits en
+       dur ne font pas. La bordure est un vert atténué vers le fond de la puce — un trait plein
+       vaudrait cerne. */
+    .chip--pick[aria-pressed="true"] {
+        background-color: var(--success-soft);
+        border-color: color-mix(in srgb, var(--success) 45%, var(--surface-raised));
+        color: var(--success);
+    }
+
     /* ---- Identité d'une ligne : nom en gras, précision en dessous ---- */
     .nm b {
         @apply block text-[13px] font-bold leading-tight truncate;
