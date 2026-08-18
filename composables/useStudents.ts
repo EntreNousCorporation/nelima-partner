@@ -26,7 +26,7 @@ export function cycleLabel(cycle?: EducationCycle | null) {
 }
 
 export type GuardianContact = {
-    type: 'EMAIL' | 'PHONE' | string;
+    type: 'EMAIL' | 'PHONE_NUMBER' | string;
     value: string;
     isPrimary?: boolean;
     whatsApp?: boolean;

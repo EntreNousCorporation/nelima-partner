@@ -29,8 +29,8 @@ function parentName(parent: Parent): string {
  */
 function parentContact(parent: Parent): string {
     const contacts = parent.contacts ?? [];
-    const phone = contacts.find((c) => c.type === 'PHONE' && c.isPrimary)
-        ?? contacts.find((c) => c.type === 'PHONE');
+    const phone = contacts.find((c) => c.type === 'PHONE_NUMBER' && c.isPrimary)
+        ?? contacts.find((c) => c.type === 'PHONE_NUMBER');
     const email = contacts.find((c) => c.type === 'EMAIL' && c.isPrimary)
         ?? contacts.find((c) => c.type === 'EMAIL');
     const primary = phone ?? email;
@@ -215,7 +215,7 @@ onMounted(async () => {
                     class="flex items-center gap-3 px-3 py-2.5"
                     style="border-bottom: 1px solid var(--border)"
                 >
-                    <BoIcon :name="contact.type === 'PHONE' ? 'phone' : 'mail'" :size="16" />
+                    <BoIcon :name="contact.type === 'PHONE_NUMBER' ? 'phone' : 'mail'" :size="16" />
                     <div class="flex-1 min-w-0">
                         <b class="block nu text-[12.5px]" style="color: var(--navy)">
                             {{ contact.value }}

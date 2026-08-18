@@ -143,8 +143,8 @@ function guardianName(g: Guardian): string {
 /** Coordonnées lisibles : téléphone principal d'abord, puis e-mail, à défaut l'identifiant. */
 function guardianContact(g: Guardian): string {
     const contacts = g.contacts ?? [];
-    const phone = contacts.find((c) => c.type === 'PHONE' && c.isPrimary)
-        ?? contacts.find((c) => c.type === 'PHONE');
+    const phone = contacts.find((c) => c.type === 'PHONE_NUMBER' && c.isPrimary)
+        ?? contacts.find((c) => c.type === 'PHONE_NUMBER');
     const email = contacts.find((c) => c.type === 'EMAIL' && c.isPrimary)
         ?? contacts.find((c) => c.type === 'EMAIL');
     const parts = [phone?.value, email?.value].filter(Boolean);
