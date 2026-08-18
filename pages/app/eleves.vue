@@ -299,7 +299,8 @@ onMounted(async () => {
                 <p class="text-[12.5px] mb-3 leading-relaxed" style="color: var(--text-muted)">
                     En-tête exact attendu :
                     <code class="text-[11.5px]">matricule;nom;prenom;date_naissance;lieu_naissance;niveau;classe</code><br />
-                    Les dates s'écrivent AAAA-MM-JJ, et le niveau doit être l'un de ceux que vous
+                    Les dates s'écrivent JJ-MM-AAAA — <code class="text-[11.5px]">14-09-2015</code> —,
+                    et le niveau doit être l'un de ceux que vous
                     avez déclarés. <strong>La colonne « classe » est facultative</strong> : renseignée,
                     l'élève y est affecté dès l'import ; laissée vide, il restera à répartir.
                     L'import est tout ou rien : si une ligne est invalide, rien n'est enregistré.
