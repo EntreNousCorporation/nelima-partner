@@ -140,17 +140,20 @@ const steps = computed(() => [
         done: (summary.value?.levelCount ?? 0) > 0,
         to: '/app/parametres?section=niveaux',
     },
-    {
-        label: 'Inscrire les élèves',
-        hint: 'Saisie une par une, ou import d\'un fichier CSV',
-        done: (summary.value?.studentCount ?? 0) > 0,
-        to: '/app/eleves',
-    },
+    // Les frais avant les élèves : ils se définissent par niveau, donc dès les niveaux déclarés,
+    // et un élève inscrit sur un niveau sans frais n'a rien à régler. Dans l'autre ordre, l'école
+    // importait quatre cents élèves puis découvrait qu'il restait tout à chiffrer.
     {
         label: 'Définir les frais et leurs échéances',
         hint: 'Scolarité, cantine, transport — puis le découpage en tranches',
         done: (summary.value?.expectedThisMonth ?? 0) > 0,
         to: '/app/paiements/frais',
+    },
+    {
+        label: 'Inscrire les élèves',
+        hint: 'Saisie une par une, ou import d\'un fichier CSV',
+        done: (summary.value?.studentCount ?? 0) > 0,
+        to: '/app/eleves',
     },
     {
         label: 'Encaisser un premier règlement',
