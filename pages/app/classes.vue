@@ -364,16 +364,17 @@ onMounted(async () => {
                             v-for="row in filtered" v-else :key="row.id" class="cl"
                             @click="opened = row"
                         >
+                            <!-- Le nom seul.
+
+                                 Une pastille en portait les trois premiers caractères, collée au
+                                 nom entier qu'elle abrégeait. Pour « CP1 A » elle affichait
+                                 « CP1 » : on la lisait comme le niveau, que la colonne voisine
+                                 donne déjà. Des initiales situent une personne parce qu'on ne la
+                                 reconnaît pas à son nom complet dans une liste ; une classe, si. -->
                             <td>
-                                <div class="flex items-center gap-2.5">
-                                    <div
-                                        class="w-[34px] h-[34px] rounded-lg grid place-items-center shrink-0 nu font-black text-[12px]"
-                                        style="background: var(--brand-50); color: var(--brand-700)"
-                                    >{{ row.name.replace(/\s/g, '').slice(0, 3) }}</div>
-                                    <b class="text-sm font-extrabold" style="color: var(--navy)">
-                                        {{ row.name }}
-                                    </b>
-                                </div>
+                                <b class="text-sm font-extrabold" style="color: var(--navy)">
+                                    {{ row.name }}
+                                </b>
                             </td>
                             <td class="text-[12.5px]" style="color: var(--text-muted)">
                                 {{ cycleLabel(row.cycle) }}
