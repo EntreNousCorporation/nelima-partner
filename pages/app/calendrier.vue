@@ -97,6 +97,24 @@ const form = reactive({
     visibleToFamilies: false,
 });
 
+/**
+ * Ce qui cloche dans l'horaire, ou rien.
+ *
+ * <p>Un événement n'a pas besoin de fin : « réunion des parents à 18 h » s'affiche très bien, la
+ * vue ne montre que l'heure de début. C'est la différence avec le créneau d'une activité, qu'on
+ * lit des deux bouts.
+ *
+ * <p>Une fin seule, en revanche, ne dit rien : la vue reste vide et les familles reçoivent
+ * « toute la journée » alors que la case est décochée. Le serveur refuse les mêmes cas.
+ */
+const slotError = computed(() => {
+    if (form.allDay || !form.endTime) return '';
+    if (!form.startTime) return "Indiquez l'heure de début, ou laissez la fin vide.";
+    // Deux « HH:mm » se comparent comme deux mots : les chiffres sont à rang fixe.
+    if (form.endTime <= form.startTime) return 'La fin doit venir après le début.';
+    return '';
+});
+
 const classesByCycle = computed(() => {
     const groups = CYCLES.map((cycle) => ({
         key: cycle.value as string,
@@ -158,6 +176,10 @@ async function load() {
 
 async function submit() {
     formError.value = '';
+    if (slotError.value) {
+        formError.value = slotError.value;
+        return;
+    }
     saving.value = true;
     try {
         const body = {
@@ -291,6 +313,10 @@ onMounted(async () => {
                     <div v-if="!form.allDay">
                         <label class="field-label" for="end">Fin</label>
                         <NelimaTimeField id="end" v-model="form.endTime" />
+                        <p
+                            v-if="slotError" class="mt-1 text-[12px]" role="alert"
+                            style="color: var(--danger)"
+                        >{{ slotError }}</p>
                     </div>
                     <div class="sm:col-span-2">
                         <label class="field-label" for="details">Précision</label>
@@ -347,7 +373,10 @@ onMounted(async () => {
                 <p v-if="formError" class="alert-danger mt-4" role="alert">{{ formError }}</p>
 
                 <div class="flex gap-2 mt-4">
-                    <button type="submit" class="btn-primary" :disabled="saving || !form.title">
+                    <button
+                        type="submit" class="btn-primary"
+                        :disabled="saving || !form.title || !!slotError"
+                    >
                         <BoIcon name="check" :size="16" />
                         {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
                     </button>
