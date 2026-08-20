@@ -66,6 +66,22 @@ const form = reactive({
     price: '' as string | number,
 });
 
+/**
+ * Ce qui cloche dans le créneau, ou rien.
+ *
+ * <p>Les deux listes ne rendent que des heures qui existent ; restent les deux fautes qu'elles ne
+ * peuvent pas voir. La fin avant le début, et le début seul — le catalogue afficherait « 16:00 – »
+ * sans fin. Le serveur refuse les mêmes deux cas ; ici c'est pour le dire avant d'envoyer.
+ */
+const slotError = computed(() => {
+    const { startTime: start, endTime: end } = form;
+    if (!start && !end) return '';
+    if (!start || !end) return 'Indiquez le début et la fin, ou laissez le créneau à fixer.';
+    // Deux « HH:mm » se comparent comme deux mots : les chiffres sont à rang fixe.
+    if (end <= start) return 'La fin doit venir après le début.';
+    return '';
+});
+
 const filtered = computed(() => {
     const q = keyword.value.trim().toLowerCase();
     return rows.value.filter((row) => {
@@ -208,6 +224,10 @@ async function loadEnrollments() {
 
 async function submit() {
     formError.value = '';
+    if (slotError.value) {
+        formError.value = slotError.value;
+        return;
+    }
     saving.value = true;
     try {
         const body = {
@@ -356,6 +376,10 @@ onMounted(async () => {
                     <div>
                         <label class="field-label" for="end">Fin</label>
                         <NelimaTimeField id="end" v-model="form.endTime" />
+                        <p
+                            v-if="slotError" class="mt-1 text-[12px]" role="alert"
+                            style="color: var(--danger)"
+                        >{{ slotError }}</p>
                     </div>
                     <div>
                         <label class="field-label" for="period">Période</label>
@@ -393,7 +417,8 @@ onMounted(async () => {
 
                 <div class="flex gap-2 mt-4">
                     <button
-                        type="submit" class="btn-primary" :disabled="saving || !form.name || !form.capacity"
+                        type="submit" class="btn-primary"
+                        :disabled="saving || !form.name || !form.capacity || !!slotError"
                     >
                         <BoIcon name="check" :size="16" />{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
                     <button type="button" class="btn-secondary" @click="showForm = false">

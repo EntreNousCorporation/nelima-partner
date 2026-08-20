@@ -1,13 +1,18 @@
 <script setup lang="ts">
 /**
- * Une heure saisie et lue sur 24 heures, quelle que soit la langue du navigateur.
+ * Une heure choisie dans deux listes, jamais tapée.
  *
- * <p>Même cause que {@link NelimaDateField} : `<input type="time">` suit la langue du navigateur,
- * si bien qu'un poste réglé en anglais affiche `02:30 PM` là où une école ivoirienne écrit
- * `14:30`. Le retour de test disait simplement « l'heure est en anglais ».
+ * <p>Le champ tapé qu'on avait avant laissait passer deux fautes. La faute de frappe d'abord —
+ * quatre chiffres à l'aveugle, `07:30` pour `17:30`. La saisie inachevée ensuite : `09:3` ne fait
+ * pas une heure, le modèle repassait à vide et l'activité s'enregistrait sans créneau, sans que
+ * rien ne le dise. Deux listes ne produisent que des heures qui existent, ou rien du tout.
  *
- * <p>La valeur échangée reste `HH:mm`, celle que le serveur attend et que l'`input type="time"`
- * produisait déjà : seul l'affichage change.
+ * <p>Même raison qu'auparavant de ne pas prendre `<input type="time">` : il suit la langue du
+ * navigateur et affiche `02:30 PM` sur un poste réglé en anglais, là où une école ivoirienne écrit
+ * `14:30`.
+ *
+ * <p>La valeur échangée reste `HH:mm`, celle que le serveur attend. Elle est désormais toujours
+ * complète : l'heure choisie sans les minutes vaut l'heure pile.
  */
 const props = withDefaults(defineProps<{
     modelValue?: string;
@@ -19,47 +24,73 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [string] }>();
 
-function toDisplay(value?: string): string {
+/** Pas de cinq minutes : les créneaux d'une école tombent dessus, et la liste reste lisible. */
+const MINUTE_STEP = 5;
+
+const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) =>
+    String(i * MINUTE_STEP).padStart(2, '0'));
+
+const hour = ref('');
+const minute = ref('');
+
+function read(value?: string) {
     const parts = (value ?? '').match(/^(\d{2}):(\d{2})/);
-    return parts ? `${parts[1]}:${parts[2]}` : '';
+    hour.value = parts ? parts[1] : '';
+    minute.value = parts ? parts[2] : '';
 }
 
-/** Rend `HH:mm`, ou une chaîne vide si l'heure n'existe pas. */
-function normalize(display: string): string {
-    const parts = display.match(/^(\d{2}):(\d{2})$/);
-    if (!parts) return '';
-    const hours = Number(parts[1]);
-    const minutes = Number(parts[2]);
-    return hours <= 23 && minutes <= 59 ? `${parts[1]}:${parts[2]}` : '';
-}
-
-const text = ref(toDisplay(props.modelValue));
+read(props.modelValue);
 
 watch(() => props.modelValue, (value) => {
-    if (normalize(text.value) !== (value ?? '')) text.value = toDisplay(value);
+    if (`${hour.value}:${minute.value}` !== (value ?? '')) read(value);
 });
 
-const invalid = computed(() => text.value.length === 5 && !normalize(text.value));
+/**
+ * Minutes proposées.
+ *
+ * <p>Un horaire déjà enregistré hors du pas de cinq — repris d'un import ou de l'ancien champ
+ * tapé — s'ajoute à la liste, sinon l'ouverture du formulaire l'effacerait à l'insu de l'école.
+ */
+const minuteOptions = computed(() => (minute.value && !MINUTES.includes(minute.value)
+    ? [...MINUTES, minute.value].sort()
+    : MINUTES));
 
-function onInput(event: Event) {
-    const digits = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 4);
-    text.value = digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2, 4)}` : digits;
-    emit('update:modelValue', normalize(text.value));
+function onHour(event: Event) {
+    hour.value = (event.target as HTMLSelectElement).value;
+    if (!hour.value) minute.value = '';
+    // L'heure sans les minutes vaut l'heure pile : personne ne veut choisir « 00 » deux fois par jour.
+    else if (!minute.value) minute.value = '00';
+    emit('update:modelValue', hour.value ? `${hour.value}:${minute.value}` : '');
+}
+
+function onMinute(event: Event) {
+    // « -- » remis sur les minutes seules ne veut rien dire : c'est l'heure pile qu'on entend.
+    minute.value = (event.target as HTMLSelectElement).value || '00';
+    emit('update:modelValue', hour.value ? `${hour.value}:${minute.value}` : '');
 }
 </script>
 
 <template>
-    <div>
-        <input
-            :id="id" :value="text" type="text" inputmode="numeric" maxlength="5"
+    <div class="flex items-center gap-1.5">
+        <select
+            :id="id" :value="hour" class="select" style="flex: 1 1 0"
             :required="required" :disabled="disabled"
-            :aria-label="ariaLabel" :aria-invalid="invalid || undefined"
-            placeholder="hh:mm" class="input"
-            :style="invalid ? 'border-color: var(--danger)' : ''"
-            @input="onInput"
-        />
-        <p v-if="invalid" class="mt-1 text-[12px]" style="color: var(--danger)">
-            Heure inexistante — de 00:00 à 23:59.
-        </p>
+            :aria-label="ariaLabel ? `${ariaLabel} — heure` : 'Heure'"
+            @change="onHour"
+        >
+            <option value="">--</option>
+            <option v-for="h in HOURS" :key="h" :value="h">{{ h }}</option>
+        </select>
+        <span class="nu text-sm" aria-hidden="true">:</span>
+        <select
+            :value="minute" class="select" style="flex: 1 1 0"
+            :disabled="disabled || !hour"
+            :aria-label="ariaLabel ? `${ariaLabel} — minutes` : 'Minutes'"
+            @change="onMinute"
+        >
+            <option value="">--</option>
+            <option v-for="m in minuteOptions" :key="m" :value="m">{{ m }}</option>
+        </select>
     </div>
 </template>
