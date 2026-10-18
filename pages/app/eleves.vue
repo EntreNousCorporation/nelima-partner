@@ -1,68 +1,138 @@
 <script setup lang="ts">
-import { levelLabel, type Gender, type LevelOfStudy, type Student } from '~/composables/useStudents';
-
-/**
- * Statut de règlement d'un élève, déduit de son solde.
- *
- * Trois états et pas deux : devoir une somme échue n'est pas devoir une somme à venir. Le premier
- * appelle une relance, le second se règle tout seul.
- */
-function paymentState(student: Student) {
-    const outstanding = Number(student.outstandingAmount ?? 0);
-    const overdue = Number(student.overdueAmount ?? 0);
-    if (overdue > 0) return { label: 'En retard', tone: 'late' as const };
-    if (outstanding > 0) return { label: 'À échoir', tone: 'warn' as const };
-    return { label: 'À jour', tone: 'ok' as const };
-}
+import {
+    levelLabel, PAYMENT_STATUSES,
+    type EducationCycle, type Gender, type LevelOfStudy, type PaymentStatus, type Student,
+    type StudentFilters, type StudentStats,
+} from '~/composables/useStudents';
 import { type SchoolClass } from '~/composables/useClasses';
-
+import type { DonutSegment } from '~/components/DonutChart.vue';
+import type { LevelBar } from '~/components/LevelBars.vue';
 import { useAuthStore } from '~/stores/auth';
 
+/**
+ * Écran Élèves : l'effectif d'un coup d'œil (cartes, répartitions, statuts), puis la liste.
+ *
+ * Tous les chiffres du haut portent sur l'école entière et viennent de `/students/stats`, calculés
+ * avec les mêmes règles que les filtres : cliquer sur l'onglet « En retard (214) » montre bien 214
+ * élèves. Les compter sur la page affichée aurait donné des chiffres faux dès la deuxième page.
+ */
 const auth = useAuthStore();
-const { search, establishmentLevels, create } = useStudents();
+const { search, stats: fetchStats, exportUrl, establishmentLevels, create } = useStudents();
 const { assign: assignToClass } = useClasses();
+const { can } = usePermissions();
 
 const students = ref<Student[]>([]);
 const levelOptions = ref<LevelOfStudy[]>([]);
+const classOptions = ref<SchoolClass[]>([]);
+const stats = ref<StudentStats | null>(null);
+const academicYear = ref<string | null>(null);
 const page = ref(0);
 const size = 20;
 const totalElements = ref(0);
 const totalPages = ref(0);
-const selectedLevel = ref<string>('');
-const selectedClass = ref<string>('');
-const keyword = ref('');
-const classOptions = ref<SchoolClass[]>([]);
-const formClass = ref<string>('');
 const loading = ref(false);
 const loadError = ref('');
 
 /** Élève dont la fiche est ouverte en tiroir. */
 const opened = ref<Student | null>(null);
 
-const { can } = usePermissions();
+/* ---- Onglets et filtres ---- */
+type Tab = 'all' | 'overdue' | 'incomplete' | 'unassigned';
+const tab = ref<Tab>('all');
+const keyword = ref('');
+const selectedLevel = ref('');
+const selectedClass = ref('');
+const selectedStatus = ref<PaymentStatus | ''>('');
+const showMoreFilters = ref(false);
+const selectedGender = ref<Gender | ''>('');
+const selectedDossier = ref<'' | 'complete' | 'incomplete'>('');
 
-/**
- * Cartes de tête.
- *
- * Les trois premières se déduisent de ce que l'écran charge déjà ; la quatrième vient du tableau
- * de bord, seul endroit qui agrège les retards. Aucune n'est inventée : une carte « départs
- * depuis la rentrée », proposée par la maquette, supposerait une notion de radiation que le
- * produit n'a pas — elle est donc absente plutôt que remplie d'un zéro trompeur.
- */
-const withoutClass = computed(() => students.value.filter((row) => !row.schoolClass).length);
-const overdue = ref<{ count: number; amount: number } | null>(null);
+/** Ce que l'onglet impose, puis ce que les filtres précisent : la même sélection sert la liste et l'export. */
+const filters = computed<StudentFilters>(() => ({
+    keyword: keyword.value || undefined,
+    levelOfStudies: selectedLevel.value ? [selectedLevel.value] : undefined,
+    schoolClassId: selectedClass.value || undefined,
+    unassignedOnly: tab.value === 'unassigned' || undefined,
+    paymentStatus: tab.value === 'overdue' ? 'OVERDUE' : selectedStatus.value || undefined,
+    incompleteDossier: tab.value === 'incomplete' ? true
+        : selectedDossier.value === 'incomplete' ? true
+            : selectedDossier.value === 'complete' ? false : undefined,
+    gender: selectedGender.value || undefined,
+}));
 
-async function loadOverdue() {
-    if (!can('accounting:read')) return;
-    try {
-        const summary = await useApi()<{ overdueCount: number; overdueAmount: number }>(
-            '/dashboard/summary');
-        overdue.value = { count: summary.overdueCount, amount: summary.overdueAmount };
-    } catch {
-        overdue.value = null;
-    }
+const tabs = computed(() => [
+    { key: 'all' as Tab, label: 'Tous les élèves', count: stats.value?.total },
+    { key: 'overdue' as Tab, label: 'En retard de paiement', count: stats.value?.overdueCount },
+    { key: 'incomplete' as Tab, label: 'Dossiers incomplets', count: stats.value?.incompleteDossier },
+    { key: 'unassigned' as Tab, label: 'Sans classe', count: stats.value?.withoutClass },
+]);
+
+const fmt = (value?: number | null) => Number(value ?? 0).toLocaleString('fr-FR');
+
+/** 86 500 000 → « 86,5 M » : le chiffre exact est dans l'onglet, la carte donne l'ordre de grandeur. */
+function compactAmount(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.', ',').replace(',0', '')} M`;
+    return fmt(value);
 }
 
+/* ---- Graphiques ---- */
+const CYCLES: { value: EducationCycle; label: string; color: string }[] = [
+    { value: 'KINDERGARTEN', label: 'Maternelle', color: '#7FB8FF' },
+    { value: 'PRIMARY', label: 'Primaire', color: 'var(--brand-600)' },
+    { value: 'MIDDLE_SCHOOL', label: 'Collège', color: '#8A5BFF' },
+    { value: 'HIGH_SCHOOL', label: 'Lycée', color: '#F0912D' },
+];
+
+/** Les cycles que l'école enseigne, plus ceux où se trouvent des élèves : pas de barre vide pour un lycée qu'elle n'a pas. */
+const levelBars = computed<LevelBar[]>(() => {
+    const declared = new Set(levelOptions.value.map((level) => level.cycle).filter(Boolean));
+    const counts = new Map((stats.value?.byCycle ?? []).map((row) => [row.cycle, row.count]));
+    const bars = CYCLES
+        .filter((cycle) => declared.has(cycle.value) || (counts.get(cycle.value) ?? 0) > 0)
+        .map((cycle) => ({ label: cycle.label, value: counts.get(cycle.value) ?? 0, color: cycle.color }));
+    const unknown = counts.get(null) ?? 0;
+    if (unknown > 0) bars.push({ label: 'Non renseigné', value: unknown, color: 'var(--border-strong)' });
+    return bars;
+});
+
+const genderSegments = computed<DonutSegment[]>(() => {
+    const s = stats.value;
+    const segments = [
+        { label: 'Filles', value: s?.female ?? 0, color: '#EF6F9A' },
+        { label: 'Garçons', value: s?.male ?? 0, color: 'var(--brand-600)' },
+    ];
+    // Le sexe est facultatif à l'inscription : le taire fausserait la part des filles.
+    if (s?.genderUnknown) segments.push({ label: 'Non renseigné', value: s.genderUnknown, color: 'var(--border-strong)' });
+    return segments;
+});
+
+const statusSegments = computed<DonutSegment[]>(() => [
+    { label: 'À jour', value: stats.value?.statusUpToDate ?? 0, color: 'var(--success-solid)' },
+    { label: 'Acompte versé', value: stats.value?.statusDeposit ?? 0, color: '#7FB8FF' },
+    { label: 'En retard', value: stats.value?.statusOverdue ?? 0, color: '#F0912D' },
+    { label: 'Dossier incomplet', value: stats.value?.statusIncomplete ?? 0, color: 'var(--danger-solid)' },
+]);
+
+function paymentPill(student: Student) {
+    return PAYMENT_STATUSES.find((status) => status.value === student.paymentStatus) ?? PAYMENT_STATUSES[0];
+}
+
+/* ---- Menu d'actions d'une ligne ---- */
+const menuFor = ref<string | null>(null);
+
+function closeMenu() {
+    menuFor.value = null;
+}
+
+function openGuichet(student: Student) {
+    closeMenu();
+    navigateTo({ path: '/app/paiements/guichet', query: { eleve: student.id } });
+}
+
+onMounted(() => document.addEventListener('click', closeMenu));
+onBeforeUnmount(() => document.removeEventListener('click', closeMenu));
+
+/* ---- Import ---- */
 const showImport = ref(false);
 const importing = ref(false);
 const importError = ref('');
@@ -91,7 +161,7 @@ async function submitImport() {
         importFile.value = null;
         showImport.value = false;
         page.value = 0;
-        await load();
+        await refresh();
     } catch (e: any) {
         // Le rapport du serveur désigne les lignes fautives : on le montre tel quel, c'est la
         // seule information qui permet à l'école de corriger son fichier.
@@ -142,7 +212,7 @@ async function assignSelection() {
         await assignToClass(targetClass.value, [...selected]);
         selected.clear();
         targetClass.value = '';
-        await load();
+        await refresh();
     } catch (e: any) {
         assignError.value = e?.data?.debugMessage ?? "L'affectation n'a pas pu être enregistrée.";
     } finally {
@@ -150,9 +220,11 @@ async function assignSelection() {
     }
 }
 
+/* ---- Inscription ---- */
 const showForm = ref(false);
 const saving = ref(false);
 const formError = ref('');
+const formClass = ref<string>('');
 const form = reactive({
     firstName: '',
     lastName: '',
@@ -171,24 +243,29 @@ async function load() {
     loading.value = true;
     loadError.value = '';
     try {
-        const result = await search({
-            page: page.value,
-            size,
-            levelOfStudies: selectedLevel.value ? [selectedLevel.value] : undefined,
-            keyword: keyword.value || undefined,
-            schoolClassId: selectedClass.value && selectedClass.value !== 'none'
-                ? selectedClass.value : undefined,
-            unassignedOnly: selectedClass.value === 'none',
-        });
+        const result = await search({ ...filters.value, page: page.value, size });
         students.value = result.content ?? [];
         totalElements.value = result.totalElements ?? 0;
         totalPages.value = result.totalPages ?? 0;
-    } catch (e: any) {
+    } catch {
         loadError.value = "La liste n'a pas pu être chargée.";
         students.value = [];
     } finally {
         loading.value = false;
     }
+}
+
+async function loadStats() {
+    try {
+        stats.value = await fetchStats();
+    } catch {
+        stats.value = null;
+    }
+}
+
+/** Après une écriture : la liste et les chiffres du haut bougent ensemble. */
+function refresh() {
+    return Promise.all([load(), loadStats()]);
 }
 
 // Une classe appartient à un niveau : choisir la classe fixe le niveau, pour ne pas saisir deux
@@ -218,7 +295,7 @@ async function submit() {
         formClass.value = '';
         // On revient en première page : l'élève créé n'est pas nécessairement sur la page courante.
         page.value = 0;
-        await load();
+        await refresh();
     } catch (e: any) {
         // Le backend renvoie un 409 sur matricule déjà pris, cas de loin le plus fréquent.
         formError.value = e?.response?.status === 409
@@ -250,7 +327,10 @@ watch(keyword, () => {
     debounce = setTimeout(() => { page.value = 0; load(); }, 300);
 });
 
-watch([selectedLevel, selectedClass], () => { page.value = 0; load(); });
+watch([tab, selectedLevel, selectedClass, selectedStatus, selectedGender, selectedDossier], () => {
+    page.value = 0;
+    load();
+});
 
 onMounted(async () => {
     // La barre supérieure envoie ici avec sa recherche : la reprendre évite de la retaper.
@@ -266,8 +346,11 @@ onMounted(async () => {
         useClasses().list()
             .then((classes) => { classOptions.value = classes; })
             .catch(() => { classOptions.value = []; }),
+        useSettings().years()
+            .then((years) => { academicYear.value = years.find((year) => year.active)?.label ?? null; })
+            .catch(() => { academicYear.value = null; }),
         load(),
-        loadOverdue(),
+        loadStats(),
     ]);
 });
 </script>
@@ -276,12 +359,13 @@ onMounted(async () => {
     <div>
         <PageHead
             title="Élèves"
-            :sub="`${totalElements} élève${totalElements > 1 ? 's' : ''} inscrit${totalElements > 1 ? 's' : ''}`"
+            :sub="[`${fmt(stats?.total ?? totalElements)} élève${(stats?.total ?? totalElements) > 1 ? 's' : ''} inscrit${(stats?.total ?? totalElements) > 1 ? 's' : ''}`,
+                   academicYear ? `année ${academicYear}` : null].filter(Boolean).join(' · ')"
         >
             <template #actions>
                 <button class="btn-secondary" @click="showImport = !showImport; showForm = false">
-                    <BoIcon :name="showImport ? 'close' : 'upload'" :size="16" />
-                    {{ showImport ? 'Annuler' : 'Importer / exporter' }}
+                    <BoIcon :name="showImport ? 'close' : 'download'" :size="16" />
+                    {{ showImport ? 'Annuler' : 'Importer' }}
                 </button>
                 <button class="btn-primary" @click="showForm = !showForm; showImport = false">
                     <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
@@ -399,51 +483,102 @@ onMounted(async () => {
             </form>
         </UiCard>
 
-        <div class="grid-12 mb-3.5">
-            <KpiCard
-                class="c3" label="Effectif total" icon="students"
-                tip="Élèves inscrits dans l'établissement, affectés à une classe ou non."
-                :value="fm(totalElements)"
-                :foot="`${classOptions.length} classe(s) ouverte(s)`"
-            />
-            <KpiCard
-                class="c3" label="Niveaux déclarés" icon="layers"
-                tip="Niveaux retenus dans les paramètres. Un élève ne peut être inscrit que dans l'un d'eux, et les frais s'y ciblent."
-                :value="String(levelOptions.length)"
-                foot="un élève ne s'inscrit que dans un niveau déclaré"
-            />
-            <KpiCard
-                class="c3" label="Sans classe" icon="alert"
-                tip="Élèves de la page affichée qui ne sont affectés à aucune classe. C'est le reliquat de la rentrée, qu'il reste à répartir."
-                :value="String(withoutClass)"
-                :value-tone="withoutClass ? 'var(--warning)' : undefined"
-                foot="à répartir sur la page affichée"
-            />
-            <KpiCard
-                v-if="overdue" class="c3" label="Familles en retard" icon="cash"
-                tip="Élèves dont au moins une échéance est dépassée. La relance groupée se lance depuis Paiements → Relances."
-                :value="String(overdue.count)"
-                :foot="`${fm(overdue.amount)} F à recouvrer`"
-            />
-            <KpiCard
-                v-else class="c3" label="Classes" icon="layers"
-                :value="String(classOptions.length)"
-                foot="salles ouvertes cette année"
-            />
+        <!-- ============ Cartes ============ -->
+        <div class="grid gap-3.5 mb-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <template v-if="stats">
+                <StatTile
+                    label="Effectif total" icon="students" tone="var(--brand-600)" soft="var(--brand-50)"
+                    tip="Élèves inscrits dans l'établissement, affectés à une classe ou non."
+                    :value="fmt(stats.total)"
+                    :foot="`${stats.classCount} classe${stats.classCount > 1 ? 's' : ''} ouverte${stats.classCount > 1 ? 's' : ''}`"
+                />
+                <StatTile
+                    label="Nouveaux inscrits" icon="clipboard" tone="var(--brand-600)" soft="var(--brand-50)"
+                    tip="Élèves inscrits depuis le premier jour du mois en cours."
+                    :value="fmt(stats.newThisMonth)" foot="depuis le début du mois"
+                />
+                <StatTile
+                    label="Dossiers incomplets" icon="alert" tone="var(--danger)" soft="var(--danger-soft)"
+                    tip="Élèves à qui il manque l'extrait de naissance ou la photo d'identité. Les pièces se versent depuis la fiche de l'élève."
+                    :value="fmt(stats.incompleteDossier)"
+                    :foot="stats.incompleteDossier ? 'Pièces à réclamer' : 'Tous les dossiers sont complets'"
+                    :foot-tone="stats.incompleteDossier ? 'var(--danger)' : 'var(--success)'"
+                    :foot-icon="stats.incompleteDossier ? undefined : 'check-circle'"
+                />
+                <StatTile
+                    label="Sans classe" icon="layers" tone="var(--purple)" soft="var(--purple-soft)"
+                    tip="Élèves qui ne sont affectés à aucune classe : le reliquat de la rentrée, qu'il reste à répartir."
+                    :value="fmt(stats.withoutClass)"
+                    :foot="stats.withoutClass ? 'À répartir' : 'Affectation complète'"
+                    :foot-tone="stats.withoutClass ? 'var(--warning)' : 'var(--success)'"
+                    :foot-icon="stats.withoutClass ? undefined : 'check-circle'"
+                />
+                <StatTile
+                    label="En retard de paiement" icon="wallet" tone="var(--warning)" soft="var(--warning-soft)"
+                    tip="Élèves dont au moins une échéance est dépassée. La relance groupée se lance depuis Paiements → Relances."
+                    :value="fmt(stats.overdueCount)"
+                    :foot="`${compactAmount(Number(stats.overdueAmount))} FCFA à recouvrer`"
+                />
+            </template>
+            <template v-else>
+                <div v-for="n in 5" :key="n" class="card p-4">
+                    <i class="sk h-3 w-24" />
+                    <i class="sk h-7 w-16 mt-3" />
+                </div>
+            </template>
+        </div>
+
+        <!-- ============ Répartitions ============ -->
+        <div v-if="stats && stats.total" class="grid gap-3.5 mb-3.5 grid-cols-1 lg:grid-cols-3">
+            <UiCard title="Répartition par niveau">
+                <template #action>
+                    <span class="text-[11.5px]" style="color: var(--text-faint)">{{ fmt(stats.total) }} élèves</span>
+                </template>
+                <LevelBars :bars="levelBars" />
+            </UiCard>
+            <UiCard title="Répartition par sexe">
+                <template #action>
+                    <span class="text-[11.5px]" style="color: var(--text-faint)">{{ fmt(stats.total) }} élèves</span>
+                </template>
+                <DonutChart :segments="genderSegments" :center-value="fmt(stats.total)" center-label="élèves" />
+            </UiCard>
+            <UiCard
+                title="Statut des élèves"
+                tip="Chaque élève compte une fois, dans ce qui demande d'abord une action : dossier incomplet, puis retard de paiement, puis acompte en cours."
+            >
+                <template #action>
+                    <span class="text-[11.5px]" style="color: var(--text-faint)">{{ fmt(stats.total) }} élèves</span>
+                </template>
+                <DonutChart :segments="statusSegments" />
+            </UiCard>
         </div>
 
         <p v-if="loadError" class="alert-danger mb-3.5" role="alert">{{ loadError }}</p>
 
+        <!-- ============ Liste ============ -->
         <UiCard :pad="false">
+            <nav class="flex flex-wrap gap-1 px-4 pt-2" style="border-bottom: 1px solid var(--border)" aria-label="Sélection d'élèves">
+                <button
+                    v-for="t in tabs" :key="t.key" type="button"
+                    class="px-3 py-2.5 text-[13px] font-bold -mb-px"
+                    :style="tab === t.key
+                        ? 'color: var(--brand-600); border-bottom: 2px solid var(--brand-600)'
+                        : 'color: var(--text-muted); border-bottom: 2px solid transparent'"
+                    :aria-current="tab === t.key ? 'page' : undefined"
+                    @click="tab = t.key"
+                >
+                    {{ t.label }}<template v-if="t.count !== undefined"> ({{ fmt(t.count) }})</template>
+                </button>
+            </nav>
+
             <div class="tbar">
-                <label class="inp" style="flex: 0 1 260px">
+                <label class="inp" style="flex: 0 1 300px">
                     <BoIcon name="search" :size="15" />
                     <input
                         v-model="keyword" type="search" class="w-full"
-                        placeholder="Nom, prénom ou matricule…" aria-label="Rechercher un élève"
+                        placeholder="Rechercher un élève, un matricule…" aria-label="Rechercher un élève"
                     />
                 </label>
-
                 <label class="inp">
                     <select v-model="selectedLevel" aria-label="Filtrer par niveau">
                         <option value="">Tous les niveaux</option>
@@ -452,18 +587,56 @@ onMounted(async () => {
                         </option>
                     </select>
                 </label>
-
                 <label class="inp">
                     <select v-model="selectedClass" aria-label="Filtrer par classe">
                         <option value="">Toutes les classes</option>
-                        <!-- « Sans classe » est le filtre utile de la rentrée : ce sont les élèves
-                             qu'il reste à répartir. -->
-                        <option value="none">Sans classe</option>
                         <option v-for="schoolClass in classOptions" :key="schoolClass.id" :value="schoolClass.id">
                             {{ schoolClass.name }}
                         </option>
                     </select>
                 </label>
+                <label class="inp">
+                    <select
+                        v-model="selectedStatus" aria-label="Filtrer par statut de paiement"
+                        :disabled="tab === 'overdue'"
+                    >
+                        <option value="">Tous les statuts</option>
+                        <option v-for="status in PAYMENT_STATUSES" :key="status.value" :value="status.value">
+                            {{ status.label }}
+                        </option>
+                    </select>
+                </label>
+                <template v-if="showMoreFilters">
+                    <label class="inp">
+                        <select v-model="selectedGender" aria-label="Filtrer par sexe">
+                            <option value="">Filles et garçons</option>
+                            <option value="FEMALE">Filles</option>
+                            <option value="MALE">Garçons</option>
+                        </select>
+                    </label>
+                    <label class="inp">
+                        <select
+                            v-model="selectedDossier" aria-label="Filtrer par état du dossier"
+                            :disabled="tab === 'incomplete'"
+                        >
+                            <option value="">Tous les dossiers</option>
+                            <option value="complete">Dossier complet</option>
+                            <option value="incomplete">Dossier incomplet</option>
+                        </select>
+                    </label>
+                </template>
+                <span class="flex-1" />
+                <button
+                    type="button" class="btn-secondary btn-sm" :aria-pressed="showMoreFilters"
+                    @click="showMoreFilters = !showMoreFilters"
+                >
+                    <BoIcon name="filter" :size="14" />
+                    {{ showMoreFilters ? 'Moins de filtres' : 'Plus de filtres' }}
+                </button>
+                <!-- Le fichier suit la sélection affichée : onglet et filtres compris. -->
+                <a :href="exportUrl(filters)" download="eleves.csv" class="btn-secondary btn-sm">
+                    <BoIcon name="download" :size="14" /> Exporter
+                </a>
             </div>
 
             <!-- La barre de répartition.
@@ -471,7 +644,7 @@ onMounted(async () => {
                  par un depuis leur fiche serait la même corvée que l'import devait éviter. -->
             <div
                 v-if="selected.size"
-                class="flex flex-wrap items-center gap-3 px-3.5 py-3 mb-3"
+                class="flex flex-wrap items-center gap-3 px-3.5 py-3 mx-4 my-3"
                 style="background: var(--brand-50); border: 1px solid var(--brand-200);
                        border-radius: var(--radius)"
             >
@@ -514,13 +687,14 @@ onMounted(async () => {
                             <th>Matricule</th>
                             <th>Niveau</th>
                             <th>Classe</th>
-                            <th class="r">Solde dû</th>
-                            <th>Statut</th>
-                            <th></th>
+                            <th>Statut paiement</th>
+                            <th class="r">Solde (F)</th>
+                            <th>Dossier</th>
+                            <th class="r">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <TableSkeleton v-if="loading" :columns="8" />
+                        <TableSkeleton v-if="loading" :columns="9" />
                         <tr
                             v-for="student in students" v-else :key="student.id"
                             class="cl" @click="opened = student"
@@ -535,41 +709,62 @@ onMounted(async () => {
                             </td>
                             <td>
                                 <div class="flex items-center gap-2.5">
-                                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :src="studentPhotoUrl(student)" :size="28" />
+                                    <AvatarBadge
+                                        :name="`${student.firstName} ${student.lastName}`"
+                                        :src="studentPhotoUrl(student)" :size="32"
+                                    />
                                     <div class="nm min-w-0">
                                         <b>{{ student.lastName }} {{ student.firstName }}</b>
                                         <span class="nu">{{ formatDate(student.birthDay) }}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="nu text-[12px]" style="color: var(--text-faint)">
+                            <td class="nu text-[12.5px]" style="color: var(--text-muted)">
                                 {{ student.registrationNumber }}
                             </td>
-                            <td><span class="tag">{{ levelLabel(student.levelOfStudy) }}</span></td>
-                            <td>
-                                <span v-if="student.schoolClass" class="tag">
-                                    {{ student.schoolClass.name }}
-                                </span>
-                                <span v-else class="text-[11.5px]" style="color: var(--text-faint)">
-                                    Sans classe
-                                </span>
+                            <td class="text-[12.5px]" style="color: var(--text-muted)">
+                                {{ levelLabel(student.levelOfStudy) }}
                             </td>
-                            <!-- Le solde en rouge dès qu'une échéance est passée : c'est ce qui
-                                 distingue la famille à relancer de celle qui a un acompte en cours. -->
+                            <td>
+                                <span v-if="student.schoolClass" class="tag">{{ student.schoolClass.name }}</span>
+                                <span v-else class="text-[11.5px]" style="color: var(--text-faint)">Sans classe</span>
+                            </td>
+                            <td>
+                                <UiPill :tone="paymentPill(student).tone">{{ paymentPill(student).label }}</UiPill>
+                            </td>
                             <td
-                                class="num" :style="Number(student.overdueAmount ?? 0) > 0
-                                    ? 'color: var(--danger)' : 'color: var(--text-faint)'"
+                                class="num font-extrabold"
+                                :style="Number(student.outstandingAmount ?? 0) > 0 ? 'color: var(--navy)' : 'color: var(--text-faint)'"
                             >
-                                {{ Number(student.outstandingAmount ?? 0) > 0
-                                    ? `${fm(Number(student.outstandingAmount))} F` : '—' }}
+                                {{ fmt(student.outstandingAmount) }}
                             </td>
                             <td>
-                                <UiPill :tone="paymentState(student).tone">
-                                    {{ paymentState(student).label }}
+                                <UiPill :tone="student.dossierComplete ? 'ok' : 'late'">
+                                    {{ student.dossierComplete ? 'Complet' : 'Incomplet' }}
                                 </UiPill>
                             </td>
-                            <td class="text-right">
-                                <BoIcon name="chevron-right" :size="16" />
+                            <td class="text-right relative" @click.stop>
+                                <button
+                                    type="button" class="btn-ghost btn-sm" :aria-label="`Actions pour ${student.lastName}`"
+                                    :aria-expanded="menuFor === student.id"
+                                    @click.stop="menuFor = menuFor === student.id ? null : student.id"
+                                >⋯</button>
+                                <div
+                                    v-if="menuFor === student.id"
+                                    class="absolute right-2 top-full z-20 card py-1 min-w-[190px] text-left"
+                                    style="box-shadow: 0 8px 24px rgba(11,46,102,.14)" role="menu"
+                                >
+                                    <button
+                                        type="button" role="menuitem"
+                                        class="block w-full text-left px-3 py-2 text-[12.5px] hover:bg-[var(--surface-sunken)]"
+                                        @click="closeMenu(); opened = student"
+                                    >Ouvrir la fiche</button>
+                                    <button
+                                        v-if="can('collection:write')" type="button" role="menuitem"
+                                        class="block w-full text-left px-3 py-2 text-[12.5px] hover:bg-[var(--surface-sunken)]"
+                                        @click="openGuichet(student)"
+                                    >Encaisser au guichet</button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -577,9 +772,9 @@ onMounted(async () => {
             </div>
 
             <EmptyState
-                v-if="!loading && !students.length && (keyword || selectedLevel)"
+                v-if="!loading && !students.length && (stats?.total ?? 0) > 0"
                 title="Aucun résultat"
-                text="Aucun élève ne correspond à cette recherche."
+                text="Aucun élève ne correspond à cette sélection."
             />
             <EmptyState
                 v-else-if="!loading && !students.length"
@@ -590,7 +785,7 @@ onMounted(async () => {
             <template #footer>
                 <span class="text-[12px]" style="color: var(--text-faint)">
                     <b class="nu" style="color: var(--navy)">{{ students.length }}</b> affichés sur
-                    <b class="nu" style="color: var(--navy)">{{ totalElements }}</b>
+                    <b class="nu" style="color: var(--navy)">{{ fmt(totalElements) }}</b>
                 </span>
                 <span v-if="totalPages > 1" class="flex items-center gap-2">
                     <button class="btn-secondary btn-sm" :disabled="page === 0" @click="changePage(-1)">
@@ -607,11 +802,10 @@ onMounted(async () => {
             </template>
         </UiCard>
 
-        <!-- `@updated` : la fiche modifiée doit se répercuter sur la liste, qui porterait sinon
-             encore l'ancien nom. -->
+        <!-- `@updated` : la fiche modifiée doit se répercuter sur la liste et sur les chiffres. -->
         <StudentDrawer
             v-if="opened" :student="opened"
-            @close="opened = null" @updated="load"
+            @close="opened = null" @updated="refresh"
         />
     </div>
 </template>

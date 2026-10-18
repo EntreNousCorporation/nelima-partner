@@ -68,7 +68,57 @@ export type Student = {
     parentUsers?: Guardian[];
     /** Photo d'identité courante ; nulle tant qu'aucune n'est versée au dossier. */
     photoId?: string | null;
+    /** Mêmes règles que le filtre et les statistiques, calculées par le serveur. */
+    paymentStatus?: PaymentStatus;
+    /** Extrait de naissance et photo au dossier. */
+    dossierComplete?: boolean;
 };
+
+export type PaymentStatus = 'UP_TO_DATE' | 'DEPOSIT' | 'OVERDUE';
+
+export const PAYMENT_STATUSES: { value: PaymentStatus; label: string; tone: 'ok' | 'warn' | 'late' }[] = [
+    { value: 'UP_TO_DATE', label: 'À jour', tone: 'ok' },
+    { value: 'DEPOSIT', label: 'Acompte', tone: 'warn' },
+    { value: 'OVERDUE', label: 'En retard', tone: 'late' },
+];
+
+export type StudentStats = {
+    total: number;
+    newThisMonth: number;
+    incompleteDossier: number;
+    withoutClass: number;
+    overdueCount: number;
+    overdueAmount: number;
+    classCount: number;
+    byCycle: { cycle: EducationCycle | null; count: number }[];
+    female: number;
+    male: number;
+    genderUnknown: number;
+    statusIncomplete: number;
+    statusOverdue: number;
+    statusDeposit: number;
+    statusUpToDate: number;
+};
+
+/** Filtres de la liste, partagés par la recherche et l'export : le fichier suit l'écran. */
+export type StudentFilters = {
+    levelOfStudies?: string[]; keyword?: string; schoolClassId?: string; unassignedOnly?: boolean;
+    paymentStatus?: PaymentStatus; incompleteDossier?: boolean; gender?: Gender;
+};
+
+function filterQuery(params: StudentFilters) {
+    const query: Record<string, any> = {};
+    if (params.levelOfStudies?.length) query.levelOfStudies = params.levelOfStudies;
+    // La recherche est faite par le serveur et non sur la page affichée : filtrer localement
+    // aurait ignoré les élèves des pages suivantes, en donnant l'air d'avoir cherché partout.
+    if (params.keyword?.trim()) query.keyword = params.keyword.trim();
+    if (params.schoolClassId) query.schoolClassId = params.schoolClassId;
+    if (params.unassignedOnly) query.unassignedOnly = true;
+    if (params.paymentStatus) query.paymentStatus = params.paymentStatus;
+    if (params.incompleteDossier !== undefined) query.incompleteDossier = params.incompleteDossier;
+    if (params.gender) query.gender = params.gender;
+    return query;
+}
 
 /**
  * Adresse de la photo d'un élève, ou rien s'il n'en a pas.
@@ -136,22 +186,24 @@ export function useStudents() {
      * L'établissement n'est jamais passé en paramètre : le serveur l'impose à partir du compte
      * connecté. L'envoyer depuis le client ne servirait qu'à laisser croire qu'il est modifiable.
      */
-    function search(params: {
-        page: number; size: number; levelOfStudies?: string[]; keyword?: string;
-        schoolClassId?: string; unassignedOnly?: boolean;
-    }) {
-        const query: Record<string, any> = { page: params.page, size: params.size };
-        if (params.levelOfStudies?.length) {
-            query.levelOfStudies = params.levelOfStudies;
-        }
-        // La recherche est faite par le serveur et non sur la page affichée : filtrer localement
-        // aurait ignoré les élèves des pages suivantes, en donnant l'air d'avoir cherché partout.
-        if (params.keyword?.trim()) {
-            query.keyword = params.keyword.trim();
-        }
-        if (params.schoolClassId) query.schoolClassId = params.schoolClassId;
-        if (params.unassignedOnly) query.unassignedOnly = true;
+    function search(params: StudentFilters & { page: number; size: number }) {
+        const query = { ...filterQuery(params), page: params.page, size: params.size };
         return api<Page<Student>>('/students/search', { query });
+    }
+
+    /** Chiffres de tout l'effectif : cartes, graphiques et compteurs des onglets. */
+    function stats() {
+        return api<StudentStats>('/students/stats');
+    }
+
+    /** Lien du fichier tableur : mêmes filtres que la liste, servi par le proxy avec la session. */
+    function exportUrl(params: StudentFilters) {
+        const query = new URLSearchParams();
+        for (const [key, value] of Object.entries(filterQuery(params))) {
+            for (const item of Array.isArray(value) ? value : [value]) query.append(key, String(item));
+        }
+        const qs = query.toString();
+        return `/api/v1/students/export${qs ? `?${qs}` : ''}`;
     }
 
     /** Catalogue complet des niveaux du système éducatif ivoirien. */
@@ -226,7 +278,7 @@ export function useStudents() {
     }
 
     return {
-        search, catalogue, establishmentLevels, create, update,
+        search, stats, exportUrl, catalogue, establishmentLevels, create, update,
         documents, uploadDocument, removeDocument, documentUrl,
     };
 }
