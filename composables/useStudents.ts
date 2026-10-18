@@ -85,6 +85,38 @@ export function levelLabel(level?: LevelOfStudy | null): string {
     return level.name?.fr?.trim() || level.code || '—';
 }
 
+export type StudentDocumentKind =
+    'BIRTH_CERTIFICATE' | 'PHOTO' | 'VACCINATION_RECORD' | 'MEDICAL_CERTIFICATE'
+    | 'PREVIOUS_REPORT_CARD' | 'OTHER';
+
+/** Dans l'ordre où une école les réclame à l'inscription. */
+export const DOCUMENT_KINDS: { value: StudentDocumentKind; label: string }[] = [
+    { value: 'BIRTH_CERTIFICATE', label: 'Extrait de naissance' },
+    { value: 'PHOTO', label: "Photo d'identité" },
+    { value: 'VACCINATION_RECORD', label: 'Carnet de vaccination' },
+    { value: 'MEDICAL_CERTIFICATE', label: 'Certificat médical' },
+    { value: 'PREVIOUS_REPORT_CARD', label: "Bulletin de l'année précédente" },
+    { value: 'OTHER', label: 'Autre pièce' },
+];
+
+export function documentKindLabel(kind: StudentDocumentKind) {
+    return DOCUMENT_KINDS.find((k) => k.value === kind)?.label ?? kind;
+}
+
+export type StudentDocument = {
+    id: string;
+    kind: StudentDocumentKind;
+    label?: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    createdAt?: string;
+    createdBy?: string;
+};
+
+/** Plafond du serveur, rappelé ici pour refuser avant l'envoi plutôt qu'après. */
+export const DOCUMENT_MAX_BYTES = 5 * 1024 * 1024;
+
 export function useStudents() {
     const api = useApi();
 
@@ -159,5 +191,30 @@ export function useStudents() {
         return api<Student>(`/students/${id}`, { method: 'PUT', body: payload });
     }
 
-    return { search, catalogue, establishmentLevels, create, update };
+    function documents(id: string) {
+        return api<StudentDocument[]>(`/students/${id}/documents`);
+    }
+
+    function uploadDocument(id: string, kind: StudentDocumentKind, file: File, label?: string) {
+        const body = new FormData();
+        body.append('kind', kind);
+        if (label) body.append('label', label);
+        body.append('file', file);
+        // Pas de Content-Type explicite : le navigateur pose lui-même la frontière multipart.
+        return api<StudentDocument>(`/students/${id}/documents`, { method: 'POST', body });
+    }
+
+    function removeDocument(id: string, documentId: string) {
+        return api(`/students/${id}/documents/${documentId}`, { method: 'DELETE' });
+    }
+
+    /** Lien servi par le proxy : la session suffit, aucune URL de stockage n'arrive au navigateur. */
+    function documentUrl(id: string, documentId: string, download = false) {
+        return `/api/v1/students/${id}/documents/${documentId}/file${download ? '?download=true' : ''}`;
+    }
+
+    return {
+        search, catalogue, establishmentLevels, create, update,
+        documents, uploadDocument, removeDocument, documentUrl,
+    };
 }

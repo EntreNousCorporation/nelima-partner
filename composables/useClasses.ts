@@ -37,6 +37,29 @@ export type SchoolClassForm = {
     levelOfStudyCode?: string;
 };
 
+/** Créneau de la semaine type d'une classe. */
+export type TimetableSlot = {
+    id: string;
+    /** Nom anglais du jour, tel que `java.time.DayOfWeek` le rend : MONDAY, TUESDAY… */
+    dayOfWeek: string;
+    /** « HH:mm:ss » tel que le serveur le rend. */
+    startTime: string;
+    endTime: string;
+    subject: string;
+    teacherId?: string;
+    teacherName?: string;
+    room?: string;
+};
+
+export type TimetableSlotForm = {
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+    subject: string;
+    teacherId?: string;
+    room?: string;
+};
+
 /** Part de la capacité occupée. Une classe sans capacité déclarée ne se compare à rien. */
 export function fillingRate(schoolClass: SchoolClass) {
     if (!schoolClass.capacity) return 0;
@@ -71,5 +94,24 @@ export function useClasses() {
         return api(`/classes/${id}/students/${studentId}`, { method: 'DELETE' });
     }
 
-    return { list, create, update, remove, assign, unassign };
+    function timetable(id: string) {
+        return api<TimetableSlot[]>(`/classes/${id}/timetable`);
+    }
+
+    function addSlot(id: string, body: TimetableSlotForm) {
+        return api<TimetableSlot>(`/classes/${id}/timetable`, { method: 'POST', body });
+    }
+
+    function updateSlot(id: string, slotId: string, body: TimetableSlotForm) {
+        return api<TimetableSlot>(`/classes/${id}/timetable/${slotId}`, { method: 'PUT', body });
+    }
+
+    function removeSlot(id: string, slotId: string) {
+        return api(`/classes/${id}/timetable/${slotId}`, { method: 'DELETE' });
+    }
+
+    return {
+        list, create, update, remove, assign, unassign,
+        timetable, addSlot, updateSlot, removeSlot,
+    };
 }

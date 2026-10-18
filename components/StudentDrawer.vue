@@ -307,6 +307,8 @@ onMounted(async () => {
             Aucun parent rattaché à cet élève pour le moment.
         </p>
 
+        <StudentDocuments :student-id="student.id" />
+
         <p class="sec">Échéancier</p>
         <div v-if="loading" class="flex flex-col gap-2.5 mb-5">
             <i v-for="n in 4" :key="n" class="sk h-6" />

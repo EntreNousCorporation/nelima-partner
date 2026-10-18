@@ -66,6 +66,9 @@ function printRoster() {
 const members = ref<Student[]>([]);
 const loading = ref(true);
 
+/** Onglet du tiroir : les élèves pour répartir, l'emploi du temps pour organiser la semaine. */
+const tab = ref<'students' | 'timetable'>('students');
+
 /*
  * La classe entière est chargée — la liste imprimable en a besoin — mais le tiroir n'en montre
  * qu'une page : trente noms d'affilée repoussaient le pied du tiroir hors de l'écran.
@@ -216,100 +219,115 @@ onMounted(loadMembers);
             </div>
         </div>
 
-        <p class="sec">Affecter un élève</p>
-        <div class="mb-1.5">
-            <input
-                v-model="query" type="search" class="input"
-                placeholder="Nom ou matricule d'un élève"
-                aria-label="Rechercher un élève"
-            />
-        </div>
-        <p v-if="searching" class="text-[12px] mb-4" style="color: var(--text-faint)">Recherche…</p>
-        <div
-            v-else-if="candidates.length" class="rounded-xl overflow-hidden mb-4"
-            style="border: 1px solid var(--border)"
-        >
+        <nav class="sub-nav" aria-label="Contenu de la classe">
             <button
-                v-for="candidate in candidates" :key="candidate.id"
-                class="flex items-center gap-2.5 px-3 py-2 w-full text-left"
-                style="border-bottom: 1px solid var(--border)"
-                :disabled="working" @click="add(candidate)"
-            >
-                <AvatarBadge :name="`${candidate.firstName} ${candidate.lastName}`" :size="26" />
-                <div class="nm flex-1 min-w-0">
-                    <b>{{ candidate.lastName }} {{ candidate.firstName }}</b>
-                    <span class="nu">
-                        {{ candidate.registrationNumber
-                        }}<template v-if="candidate.schoolClass"> · déjà en {{ candidate.schoolClass.name }}</template>
-                    </span>
-                </div>
-                <span class="btn-secondary btn-sm">
-                    {{ candidate.schoolClass ? 'Déplacer' : 'Affecter' }}
-                </span>
-            </button>
-        </div>
-        <p
-            v-else-if="query.trim().length >= 2" class="text-[12px] mb-4"
-            style="color: var(--text-faint)"
-        >
-            Aucun élève ne correspond.
-        </p>
-
-        <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
-
-        <div class="flex items-center justify-between" style="margin-bottom: 6px">
-            <p class="sec" style="margin: 0">Élèves de la classe</p>
+                type="button" :aria-current="tab === 'students' ? 'page' : undefined"
+                @click="tab = 'students'"
+            >Élèves</button>
             <button
-                class="btn-secondary btn-sm" :disabled="loading || !members.length"
-                title="Imprimer la liste de la classe" @click="printRoster"
-            >
-                <BoIcon name="print" :size="14" /> Liste de classe
-            </button>
-        </div>
-        <div v-if="loading" class="flex flex-col gap-2.5">
-            <i v-for="n in 4" :key="n" class="sk h-6" />
-        </div>
-        <div v-else-if="members.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
+                type="button" :aria-current="tab === 'timetable' ? 'page' : undefined"
+                @click="tab = 'timetable'"
+            >Emploi du temps</button>
+        </nav>
+
+        <ClassTimetable v-if="tab === 'timetable'" :school-class="schoolClass" />
+
+        <template v-else>
+            <p class="sec">Affecter un élève</p>
+            <div class="mb-1.5">
+                <input
+                    v-model="query" type="search" class="input"
+                    placeholder="Nom ou matricule d'un élève"
+                    aria-label="Rechercher un élève"
+                />
+            </div>
+            <p v-if="searching" class="text-[12px] mb-4" style="color: var(--text-faint)">Recherche…</p>
             <div
-                v-for="student in visibleMembers" :key="student.id"
-                class="flex items-center gap-2.5 px-3 py-2"
-                style="border-bottom: 1px solid var(--border)"
+                v-else-if="candidates.length" class="rounded-xl overflow-hidden mb-4"
+                style="border: 1px solid var(--border)"
             >
-                <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="26" tone="mute" />
-                <div class="nm flex-1 min-w-0">
-                    <b>{{ student.lastName }} {{ student.firstName }}</b>
-                    <span class="nu">{{ student.registrationNumber }}</span>
-                </div>
-                <button class="btn-ghost btn-sm" :disabled="working" @click="remove(student)">
-                    Retirer
+                <button
+                    v-for="candidate in candidates" :key="candidate.id"
+                    class="flex items-center gap-2.5 px-3 py-2 w-full text-left"
+                    style="border-bottom: 1px solid var(--border)"
+                    :disabled="working" @click="add(candidate)"
+                >
+                    <AvatarBadge :name="`${candidate.firstName} ${candidate.lastName}`" :size="26" />
+                    <div class="nm flex-1 min-w-0">
+                        <b>{{ candidate.lastName }} {{ candidate.firstName }}</b>
+                        <span class="nu">
+                            {{ candidate.registrationNumber
+                            }}<template v-if="candidate.schoolClass"> · déjà en {{ candidate.schoolClass.name }}</template>
+                        </span>
+                    </div>
+                    <span class="btn-secondary btn-sm">
+                        {{ candidate.schoolClass ? 'Déplacer' : 'Affecter' }}
+                    </span>
                 </button>
             </div>
-        </div>
-        <div
-            v-if="!loading && memberPages > 1"
-            class="flex items-center justify-between mt-2.5"
-        >
-            <span class="text-[12px]" style="color: var(--text-faint)">
-                <b class="nu" style="color: var(--navy)">{{ memberPage * PAGE_SIZE + 1 }}–{{
-                    Math.min((memberPage + 1) * PAGE_SIZE, members.length) }}</b> sur
-                <b class="nu" style="color: var(--navy)">{{ members.length }}</b>
-            </span>
-            <span class="flex items-center gap-2">
-                <button class="btn-secondary btn-sm" :disabled="memberPage === 0" @click="memberPage--">
-                    Précédent
-                </button>
-                <span class="text-[12px]" style="color: var(--text-faint)">
-                    {{ memberPage + 1 }} / {{ memberPages }}
-                </span>
+            <p
+                v-else-if="query.trim().length >= 2" class="text-[12px] mb-4"
+                style="color: var(--text-faint)"
+            >
+                Aucun élève ne correspond.
+            </p>
+
+            <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
+
+            <div class="flex items-center justify-between" style="margin-bottom: 6px">
+                <p class="sec" style="margin: 0">Élèves de la classe</p>
                 <button
-                    class="btn-secondary btn-sm" :disabled="memberPage >= memberPages - 1"
-                    @click="memberPage++"
-                >Suivant</button>
-            </span>
-        </div>
-        <p v-if="!loading && !members.length" class="text-[12.5px]" style="color: var(--text-faint)">
-            Classe vide. Affectez-y des élèves depuis le champ ci-dessus.
-        </p>
+                    class="btn-secondary btn-sm" :disabled="loading || !members.length"
+                    title="Imprimer la liste de la classe" @click="printRoster"
+                >
+                    <BoIcon name="printer" :size="14" /> Liste de classe
+                </button>
+            </div>
+            <div v-if="loading" class="flex flex-col gap-2.5">
+                <i v-for="n in 4" :key="n" class="sk h-6" />
+            </div>
+            <div v-else-if="members.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
+                <div
+                    v-for="student in visibleMembers" :key="student.id"
+                    class="flex items-center gap-2.5 px-3 py-2"
+                    style="border-bottom: 1px solid var(--border)"
+                >
+                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="26" tone="mute" />
+                    <div class="nm flex-1 min-w-0">
+                        <b>{{ student.lastName }} {{ student.firstName }}</b>
+                        <span class="nu">{{ student.registrationNumber }}</span>
+                    </div>
+                    <button class="btn-ghost btn-sm" :disabled="working" @click="remove(student)">
+                        Retirer
+                    </button>
+                </div>
+            </div>
+            <div
+                v-if="!loading && memberPages > 1"
+                class="flex items-center justify-between mt-2.5"
+            >
+                <span class="text-[12px]" style="color: var(--text-faint)">
+                    <b class="nu" style="color: var(--navy)">{{ memberPage * PAGE_SIZE + 1 }}–{{
+                        Math.min((memberPage + 1) * PAGE_SIZE, members.length) }}</b> sur
+                    <b class="nu" style="color: var(--navy)">{{ members.length }}</b>
+                </span>
+                <span class="flex items-center gap-2">
+                    <button class="btn-secondary btn-sm" :disabled="memberPage === 0" @click="memberPage--">
+                        Précédent
+                    </button>
+                    <span class="text-[12px]" style="color: var(--text-faint)">
+                        {{ memberPage + 1 }} / {{ memberPages }}
+                    </span>
+                    <button
+                        class="btn-secondary btn-sm" :disabled="memberPage >= memberPages - 1"
+                        @click="memberPage++"
+                    >Suivant</button>
+                </span>
+            </div>
+            <p v-if="!loading && !members.length" class="text-[12.5px]" style="color: var(--text-faint)">
+                Classe vide. Affectez-y des élèves depuis le champ ci-dessus.
+            </p>
+        </template>
 
         <template #footer>
             <!-- Modifier depuis le détail : c'est ici qu'on ouvre une classe pour la regarder, donc
