@@ -2,7 +2,7 @@
 import {
     NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_EVENT_LABELS,
     auditActionLabel, primaryContact,
-    type AcademicYear, type AuditEvent, type Establishment, type NotificationChannel,
+    type AcademicYear, type AuditEvent, type YearClosure, type Establishment, type NotificationChannel,
     type NotificationEvent, type NotificationPreference,
 } from '~/composables/useSettings';
 import { isoDate } from '~/composables/useCalendar';
@@ -217,6 +217,7 @@ const periodsForm = ref<{ label: string; startDate: string; endDate: string }[]>
 async function loadYears() {
     await consultedYear.refresh();
     chosenYear.value = consultedYear.consulted.value?.id ?? '';
+    await loadClosure();
 }
 
 /** Changer d'année recharge l'application : tous les écrans doivent la suivre, sans exception. */
@@ -249,6 +250,37 @@ function addPeriod() {
 
 function removePeriod(index: number) {
     periodsForm.value.splice(index, 1);
+}
+
+/* Clôture de l'année consultée. */
+const closure = ref<YearClosure | null>(null);
+const confirmingClose = ref(false);
+const closing = ref(false);
+
+async function loadClosure() {
+    const year = consultedYear.consulted.value;
+    if (!year) return;
+    try {
+        closure.value = await settings.closure(year.id);
+    } catch {
+        closure.value = null;
+    }
+}
+
+async function closeYear() {
+    const year = consultedYear.consulted.value;
+    if (!year) return;
+    closing.value = true;
+    try {
+        closure.value = await settings.closeYear(year.id);
+        confirmingClose.value = false;
+        await loadYears();
+        done(`L'année ${year.label} est clôturée.`);
+    } catch (e) {
+        fail(e, "L'année n'a pas pu être clôturée.");
+    } finally {
+        closing.value = false;
+    }
 }
 
 async function submitPeriods() {
@@ -608,6 +640,81 @@ onMounted(async () => {
                                 <button type="button" class="btn-secondary" @click="editingPeriods = false">Annuler</button>
                             </div>
                         </form>
+                    </UiCard>
+
+                    <UiCard
+                        v-if="closure" :title="`Clôture ${closure.label}`"
+                        sub="Une année clôturée se consulte et ne se modifie plus. Il faut que tout ce qu'elle a engagé soit encaissé."
+                    >
+                        <template v-if="closure.status === 'CLOSED'">
+                            <p class="text-[13px]">
+                                <UiPill tone="mute">Clôturée</UiPill>
+                                <span class="ml-2">
+                                    le {{ closure.closedAt ? new Date(closure.closedAt).toLocaleDateString('fr-FR') : '—' }}
+                                    <template v-if="closure.closedBy"> par {{ closure.closedBy }}</template>
+                                </span>
+                            </p>
+                        </template>
+                        <template v-else-if="closure.current">
+                            <p class="text-[13px]">
+                                C'est l'année en cours : elle se clôturera une fois l'année suivante commencée,
+                                quand tout ce qu'elle a engagé sera encaissé.
+                            </p>
+                        </template>
+                        <template v-else>
+                            <div class="flex flex-wrap gap-6 text-[13px] mb-3">
+                                <div>
+                                    <div class="kpi-label">Reste à encaisser</div>
+                                    <div class="kpi-value text-[20px]">{{ Number(closure.pendingAmount).toLocaleString('fr-FR') }}<small>F</small></div>
+                                </div>
+                                <div>
+                                    <div class="kpi-label">Tranches dues</div>
+                                    <div class="kpi-value text-[20px]">{{ closure.pendingCount }}</div>
+                                </div>
+                                <div v-if="closure.paymentsInProgress">
+                                    <div class="kpi-label">Paiements en ligne en attente</div>
+                                    <div class="kpi-value text-[20px]">{{ closure.paymentsInProgress }}</div>
+                                </div>
+                            </div>
+                            <p v-if="closure.blocker" class="alert-danger mb-3">{{ closure.blocker }}</p>
+
+                            <div v-if="closure.outstanding.length" class="table-wrap mb-3">
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>Élève</th><th>Matricule</th><th class="r">Tranches</th><th class="r">Montant</th><th /></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="row in closure.outstanding" :key="row.studentId">
+                                            <td><b>{{ row.studentName }}</b></td>
+                                            <td class="nu">{{ row.registrationNumber }}</td>
+                                            <td class="num">{{ row.installmentCount }}</td>
+                                            <td class="num">{{ Number(row.amount).toLocaleString('fr-FR') }} F</td>
+                                            <td class="text-right">
+                                                <NuxtLink :to="`/app/paiements/guichet?eleve=${row.studentId}`" class="btn-ghost btn-sm">
+                                                    Encaisser
+                                                </NuxtLink>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <template v-if="canWrite">
+                                <button
+                                    v-if="!confirmingClose" class="btn-primary" :disabled="!closure.closable"
+                                    @click="confirmingClose = true"
+                                >Clôturer l'année {{ closure.label }}</button>
+                                <div v-else class="flex flex-wrap items-center gap-2">
+                                    <span class="text-[13px] font-semibold" style="color: var(--danger)">
+                                        Clôture définitive : plus rien ne pourra être créé ni modifié dans {{ closure.label }}.
+                                    </span>
+                                    <button class="btn-primary" :disabled="closing" @click="closeYear">
+                                        {{ closing ? 'Clôture…' : 'Confirmer la clôture' }}
+                                    </button>
+                                    <button class="btn-secondary" @click="confirmingClose = false">Annuler</button>
+                                </div>
+                            </template>
+                        </template>
                     </UiCard>
 
                     <UiCard

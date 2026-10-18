@@ -13,6 +13,8 @@ export function useConsultedYear() {
     const consulted = computed(() => years.value.find((year) => year.consulted)
         ?? years.value.find((year) => year.active) ?? null);
     const current = computed(() => years.value.find((year) => year.active) ?? null);
+    /** L'année affichée est clôturée : tout se consulte, rien ne se modifie. */
+    const readOnly = computed(() => consulted.value?.status === 'CLOSED');
     /** Vrai quand l'utilisateur regarde une autre année que l'année en cours. */
     const elsewhere = computed(() => !!consulted.value && !!current.value && consulted.value.id !== current.value.id);
 
@@ -26,5 +28,5 @@ export function useConsultedYear() {
         }
     }
 
-    return { years, consulted, current, elsewhere, loaded, refresh };
+    return { years, consulted, current, elsewhere, readOnly, loaded, refresh };
 }

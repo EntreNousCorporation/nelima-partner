@@ -13,7 +13,13 @@ import { useAuthStore } from '~/stores/auth';
 export function usePermissions() {
     const auth = useAuthStore();
 
+    const { readOnly } = useConsultedYear();
+
     function can(permission: string) {
+        // Une année clôturée se consulte, elle ne se modifie plus : toute écriture tombe, et avec
+        // elle chaque bouton qui en dépend. Le serveur le refuse aussi, mais un bouton qui mène à
+        // un refus est une promesse que l'écran ne tient pas.
+        if (readOnly.value && /:(write|manage)$/.test(permission)) return false;
         const granted = auth.user?.permissions;
         if (!granted) return true;
         return granted.includes(permission);

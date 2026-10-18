@@ -81,6 +81,22 @@ export type AcademicYear = {
 
 export type AcademicPeriodForm = { label: string; startDate: string; endDate: string };
 
+/** Où en est la clôture d'une année dans l'école. */
+export type YearClosure = {
+    academicYearId: string;
+    label: string;
+    status: 'OPEN' | 'CLOSED';
+    closedAt?: string | null;
+    closedBy?: string | null;
+    current: boolean;
+    closable: boolean;
+    blocker?: string | null;
+    pendingCount: number;
+    pendingAmount: number;
+    paymentsInProgress: number;
+    outstanding: { studentId: string; studentName: string; registrationNumber: string; installmentCount: number; amount: number }[];
+};
+
 export type NotificationEvent = 'RECEIPT_ISSUED' | 'INSTALLMENT_DUE_SOON' | 'INSTALLMENT_OVERDUE';
 export type NotificationChannel = 'PUSH' | 'EMAIL' | 'SMS';
 
@@ -169,6 +185,15 @@ export function useSettings() {
         return api<AcademicYear>(`/academic-years/${id}/periods`, { method: 'PUT', body: periods });
     }
 
+    function closure(id: string) {
+        return api<YearClosure>(`/academic-years/${id}/closure`);
+    }
+
+    /** Clôture l'année dans l'école : refusé tant que tout n'est pas encaissé. */
+    function closeYear(id: string) {
+        return api<YearClosure>(`/academic-years/${id}/close`, { method: 'POST' });
+    }
+
     /** L'année que l'utilisateur consulte ; sans identifiant, retour à l'année en cours. */
     function consult(id?: string) {
         return api('/academic-years/consulted', { method: 'PUT', query: id ? { academicYearId: id } : {} });
@@ -196,7 +221,7 @@ export function useSettings() {
 
     return {
         establishment, updateEstablishment,
-        years, definePeriods, consult,
+        years, definePeriods, consult, closure, closeYear,
         notifications, setNotification,
         audit,
     };

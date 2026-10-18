@@ -5,6 +5,7 @@ import { CYCLES, cycleLabel, levelLabel, type EducationCycle, type LevelOfStudy 
 import { fullName, type StaffMember } from '~/composables/useStaff';
 
 const auth = useAuthStore();
+const { can } = usePermissions();
 const { list, create, update, remove } = useClasses();
 const { establishmentLevels } = useStudents();
 const { list: listStaff } = useStaff();
@@ -226,7 +227,7 @@ onMounted(async () => {
                 : 'Répartition des élèves et remplissage des salles'"
         >
             <template #actions>
-                <button class="btn-primary" @click="openCreate">
+                <button v-if="can('class:write')" class="btn-primary" @click="openCreate">
                     <BoIcon name="plus" :size="16" />Nouvelle classe</button>
             </template>
         </PageHead>

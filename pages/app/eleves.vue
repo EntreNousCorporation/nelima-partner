@@ -362,11 +362,11 @@ onMounted(async () => {
                    academicYear ? `année ${academicYear}` : null].filter(Boolean).join(' · ')"
         >
             <template #actions>
-                <button class="btn-secondary" @click="showImport = !showImport; showForm = false">
+                <button v-if="can('student:write')" class="btn-secondary" @click="showImport = !showImport; showForm = false">
                     <BoIcon :name="showImport ? 'close' : 'download'" :size="16" />
                     {{ showImport ? 'Annuler' : 'Importer' }}
                 </button>
-                <button class="btn-primary" @click="showForm = !showForm; showImport = false">
+                <button v-if="can('student:write')" class="btn-primary" @click="showForm = !showForm; showImport = false">
                     <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
                     {{ showForm ? 'Annuler' : 'Inscrire un élève' }}
                 </button>

@@ -20,6 +20,7 @@ type Schedule = {
 };
 
 const auth = useAuthStore();
+const { can } = usePermissions();
 const api = useApi();
 const { establishmentLevels } = useStudents();
 
@@ -265,7 +266,7 @@ onMounted(async () => {
             sub="Définis par niveau, appliqués automatiquement aux élèves concernés"
         >
             <template #actions>
-                <button class="btn-primary" @click="showForm ? closeForm() : openCreate()">
+                <button v-if="can('fee:write')" class="btn-primary" @click="showForm ? closeForm() : openCreate()">
                     <BoIcon :name="showForm ? 'close' : 'plus'" :size="16" />
                     {{ showForm ? 'Annuler' : 'Nouveau frais' }}
                 </button>
