@@ -227,6 +227,9 @@ onMounted(async () => {
                 : 'Répartition des élèves et remplissage des salles'"
         >
             <template #actions>
+                <NuxtLink v-if="can('class:write')" to="/app/rentree" class="btn-secondary">
+                    <BoIcon name="calendar" :size="16" /> Préparer la rentrée
+                </NuxtLink>
                 <button v-if="can('class:write')" class="btn-primary" @click="openCreate">
                     <BoIcon name="plus" :size="16" />Nouvelle classe</button>
             </template>
