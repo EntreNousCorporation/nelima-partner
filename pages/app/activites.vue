@@ -276,11 +276,11 @@ async function cancelEnrollment(line: ActivityEnrollment) {
 }
 
 async function refresh() {
-    await load();
+    // Les inscriptions ne dépendent pas de la liste : elles se rechargent en même temps.
+    await Promise.all([load(), tab.value === 'enrollments' ? loadEnrollments() : undefined]);
     if (opened.value) {
         opened.value = rows.value.find((r) => r.id === opened.value?.id) ?? null;
     }
-    if (tab.value === 'enrollments') await loadEnrollments();
 }
 
 watch(tab, (value) => {

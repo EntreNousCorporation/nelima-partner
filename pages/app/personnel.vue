@@ -97,10 +97,9 @@ async function point(line: AttendanceLine, status: AttendanceStatus) {
     pointing.value = line.staffId;
     try {
         await recordAttendance(line.staffId, { day: day.value, status });
-        await loadSheet();
         // L'annuaire affiche le statut du jour : le laisser périmé donnerait deux réponses
-        // différentes à la même question sur le même écran.
-        if (day.value === today) await load();
+        // différentes à la même question sur le même écran. Les deux se relisent ensemble.
+        await Promise.all([loadSheet(), day.value === today ? load() : undefined]);
     } catch (e: any) {
         error.value = e?.data?.debugMessage ?? "Le pointage n'a pas pu être enregistré.";
     } finally {

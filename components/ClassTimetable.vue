@@ -182,13 +182,14 @@ function printGrid() {
 }
 
 onMounted(async () => {
-    try {
-        teachers.value = (await listStaff()).filter((member) => member.role === 'TEACHER');
-    } catch {
-        // Sans droit de lecture sur le personnel, le créneau s'enregistre sans enseignant.
-        teachers.value = [];
-    }
-    await load();
+    // La grille n'attend pas la liste des enseignants, qui ne sert qu'au formulaire.
+    await Promise.all([
+        listStaff()
+            .then((staff) => { teachers.value = staff.filter((member) => member.role === 'TEACHER'); })
+            // Sans droit de lecture sur le personnel, le créneau s'enregistre sans enseignant.
+            .catch(() => { teachers.value = []; }),
+        load(),
+    ]);
 });
 </script>
 
