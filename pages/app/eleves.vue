@@ -257,18 +257,18 @@ onMounted(async () => {
     const requested = useRoute().query.q;
     if (typeof requested === 'string' && requested) keyword.value = requested;
 
-    try {
-        levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
-    } catch {
-        levelOptions.value = [];
-    }
-    try {
-        classOptions.value = await useClasses().list();
-    } catch {
-        classOptions.value = [];
-    }
-    await load();
-    await loadOverdue();
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        establishmentLevels(auth.user?.establishmentId)
+            .then((levels) => { levelOptions.value = levels; })
+            .catch(() => { levelOptions.value = []; }),
+        useClasses().list()
+            .then((classes) => { classOptions.value = classes; })
+            .catch(() => { classOptions.value = []; }),
+        load(),
+        loadOverdue(),
+    ]);
 });
 </script>
 

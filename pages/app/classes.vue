@@ -199,22 +199,21 @@ function editOpened() {
 }
 
 onMounted(async () => {
-    try {
-        levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
-    } catch {
-        levelOptions.value = [];
-    }
-    try {
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        establishmentLevels(auth.user?.establishmentId)
+            .then((levels) => { levelOptions.value = levels; })
+            .catch(() => { levelOptions.value = []; }),
         // Seul un enseignant tient une classe : la direction et l'administratif n'ont pas vocation
         // à en être titulaires, et le backend le refuse désormais.
-        teachers.value = (await listStaff())
-            .filter((member) => member.role === 'TEACHER');
-    } catch {
-        // Un rôle sans droit de lecture sur le personnel garde l'écran des classes utilisable :
-        // le champ libre prend alors le relais.
-        teachers.value = [];
-    }
-    await load();
+        listStaff()
+            .then((staff) => { teachers.value = staff.filter((member) => member.role === 'TEACHER'); })
+            // Un rôle sans droit de lecture sur le personnel garde l'écran des classes utilisable :
+            // le champ libre prend alors le relais.
+            .catch(() => { teachers.value = []; }),
+        load(),
+    ]);
 });
 </script>
 

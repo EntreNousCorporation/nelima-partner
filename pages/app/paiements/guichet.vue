@@ -111,11 +111,17 @@ function usePayer(payer: Payer) {
 const route = useRoute();
 const notice = ref('');
 
-async function preselectFromRoute() {
+function fetchRouteStudent(): Promise<Installment[]> | null {
     const studentId = typeof route.query.eleve === 'string' ? route.query.eleve : '';
-    if (!studentId) return;
+    if (!studentId) return null;
+    return installments({ status: 'PENDING', studentId, size: 200 }).then((page) => page.content ?? []);
+}
+
+/** La fusion attend la liste générale, qui sinon l'écraserait en arrivant ; la requête, non. */
+async function preselectFromRoute(ownRequest: Promise<Installment[]> | null) {
+    if (!ownRequest) return;
     try {
-        const own = (await installments({ status: 'PENDING', studentId, size: 200 })).content ?? [];
+        const own = await ownRequest;
         if (!own.length) {
             notice.value = "Cet élève n'a aucune tranche en attente de règlement.";
             return;
@@ -206,8 +212,11 @@ async function load() {
 }
 
 onMounted(async () => {
+    // Les tranches de l'élève partent en même temps que le reste de la page.
+    const ownRequest = fetchRouteStudent();
+    ownRequest?.catch(() => undefined);
     await load();
-    await preselectFromRoute();
+    await preselectFromRoute(ownRequest);
 });
 </script>
 

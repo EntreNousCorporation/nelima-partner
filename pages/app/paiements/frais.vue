@@ -247,12 +247,14 @@ const totalExpected = computed(() =>
     filtered.value.reduce((sum, f) => sum + Number(f.price ?? 0), 0));
 
 onMounted(async () => {
-    try {
-        levelOptions.value = await establishmentLevels(auth.user?.establishmentId);
-    } catch {
-        levelOptions.value = [];
-    }
-    await load();
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        establishmentLevels(auth.user?.establishmentId)
+            .then((levels) => { levelOptions.value = levels; })
+            .catch(() => { levelOptions.value = []; }),
+        load(),
+    ]);
 });
 </script>
 

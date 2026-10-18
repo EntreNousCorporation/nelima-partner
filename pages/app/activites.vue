@@ -288,17 +288,17 @@ watch(tab, (value) => {
 });
 
 onMounted(async () => {
-    try {
-        classes.value = await listClasses();
-    } catch {
-        classes.value = [];
-    }
-    try {
-        coaches.value = (await listStaff()).filter((m) => m.role !== 'SUPPORT');
-    } catch {
-        coaches.value = [];
-    }
-    await load();
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        listClasses()
+            .then((list) => { classes.value = list; })
+            .catch(() => { classes.value = []; }),
+        listStaff()
+            .then((staff) => { coaches.value = staff.filter((m) => m.role !== 'SUPPORT'); })
+            .catch(() => { coaches.value = []; }),
+        load(),
+    ]);
 });
 </script>
 

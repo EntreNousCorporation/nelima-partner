@@ -246,12 +246,14 @@ const notified = ref<number | null>(null);
 watch([year, month], load);
 
 onMounted(async () => {
-    try {
-        classes.value = await listClasses();
-    } catch {
-        classes.value = [];
-    }
-    await load();
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        listClasses()
+            .then((list) => { classes.value = list; })
+            .catch(() => { classes.value = []; }),
+        load(),
+    ]);
 });
 </script>
 

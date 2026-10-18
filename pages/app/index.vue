@@ -190,61 +190,77 @@ const academicYear = ref<string | null>(null);
 
 async function loadExtras() {
     const from = isoDate(new Date());
-
-    try {
-        const { years } = useSettings();
-        academicYear.value = (await years()).find((year) => year.active)?.label ?? null;
-    } catch {
-        academicYear.value = null;
-    }
     const to = isoDate(new Date(new Date().setDate(new Date().getDate() + 15)));
 
+    // Blocs indépendants, chargés ensemble : les enchaîner faisait apparaître le tableau de bord
+    // par morceaux, chacun attendant le précédent sans en avoir besoin.
+    const tasks: Promise<unknown>[] = [
+        (async () => {
+            try {
+                const { years } = useSettings();
+                academicYear.value = (await years()).find((year) => year.active)?.label ?? null;
+            } catch {
+                academicYear.value = null;
+            }
+        })(),
+    ];
+
     if (canSeeCalendar.value) {
-        try {
-            const { list } = useCalendar();
-            events.value = (await list(from, to)).slice(0, 5);
-        } catch {
-            events.value = [];
-        }
+        tasks.push((async () => {
+            try {
+                const { list } = useCalendar();
+                events.value = (await list(from, to)).slice(0, 5);
+            } catch {
+                events.value = [];
+            }
+        })());
     }
 
     if (money.value) {
-        try {
-            const { list } = useTransactions();
-            const firstOfMonth = new Date();
-            firstOfMonth.setDate(1);
-            const rows = await list(isoDate(firstOfMonth), from);
-            methods.value = aggregateByChannel(rows);
-        } catch {
-            methods.value = [];
-        }
+        tasks.push((async () => {
+            try {
+                const { list } = useTransactions();
+                const firstOfMonth = new Date();
+                firstOfMonth.setDate(1);
+                const rows = await list(isoDate(firstOfMonth), from);
+                methods.value = aggregateByChannel(rows);
+            } catch {
+                methods.value = [];
+            }
+        })());
     }
 
     if (!money.value && canSeeStaff.value) {
-        try {
-            const { attendanceSheet } = useStaff();
-            const sheet = await attendanceSheet(from);
-            staffPresence.value = {
-                present: sheet.filter((line) => line.status === 'PRESENT' || line.status === 'LATE').length,
-                total: sheet.length,
-            };
-        } catch {
-            staffPresence.value = null;
-        }
+        tasks.push((async () => {
+            try {
+                const { attendanceSheet } = useStaff();
+                const sheet = await attendanceSheet(from);
+                staffPresence.value = {
+                    present: sheet.filter((line) => line.status === 'PRESENT' || line.status === 'LATE').length,
+                    total: sheet.length,
+                };
+            } catch {
+                staffPresence.value = null;
+            }
+        })());
     }
 
     if (!money.value && canSeeActivities.value) {
-        try {
-            const { list } = useActivities();
-            const rows = await list();
-            activityCount.value = {
-                open: rows.filter((activity) => activity.status === 'ACTIVE').length,
-                enrolled: rows.reduce((total, activity) => total + (activity.enrolledCount ?? 0), 0),
-            };
-        } catch {
-            activityCount.value = null;
-        }
+        tasks.push((async () => {
+            try {
+                const { list } = useActivities();
+                const rows = await list();
+                activityCount.value = {
+                    open: rows.filter((activity) => activity.status === 'ACTIVE').length,
+                    enrolled: rows.reduce((total, activity) => total + (activity.enrolledCount ?? 0), 0),
+                };
+            } catch {
+                activityCount.value = null;
+            }
+        })());
     }
+
+    await Promise.all(tasks);
 }
 
 /** Teintes des canaux d'encaissement, dans l'ordre du prototype. */

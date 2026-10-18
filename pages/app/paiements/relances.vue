@@ -117,14 +117,15 @@ async function launch() {
 }
 
 onMounted(async () => {
-    try {
-        rows.value = (await installments({ status: 'PENDING', dueBefore: today, size: 200 })).content ?? [];
-    } catch {
-        error.value = "Les impayés n'ont pas pu être chargés.";
-    } finally {
-        loading.value = false;
-    }
-    await loadReminders();
+    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
+    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
+    await Promise.all([
+        installments({ status: 'PENDING', dueBefore: today, size: 200 })
+            .then((page) => { rows.value = page.content ?? []; })
+            .catch(() => { error.value = "Les impayés n'ont pas pu être chargés."; })
+            .finally(() => { loading.value = false; }),
+        loadReminders(),
+    ]);
 });
 </script>
 
