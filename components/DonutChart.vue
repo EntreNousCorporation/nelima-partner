@@ -71,7 +71,7 @@ const fmt = (value: number) => value.toLocaleString('fr-FR');
                 <i class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: segment.color }" />
                 <span class="flex-1" style="color: var(--text)">{{ segment.label }}</span>
                 <b class="nu" style="color: var(--navy)">{{ fmt(segment.value) }}</b>
-                <span class="nu w-[46px] text-right" style="color: var(--text-faint)">({{ share(segment.value) }} %)</span>
+                <span class="nu w-[58px] text-right whitespace-nowrap" style="color: var(--text-faint)">({{ share(segment.value) }} %)</span>
             </li>
         </ul>
     </div>
