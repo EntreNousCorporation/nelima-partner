@@ -286,25 +286,42 @@ onMounted(async () => {
                     >+ cours</button>
                 </div>
                 <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
-                    <component
-                        :is="canWrite ? 'button' : 'div'"
-                        v-for="slot in day.slots" :key="slot.id"
-                        class="flex items-center gap-3 px-3 py-2 w-full text-left"
-                        style="border-bottom: 1px solid var(--border)"
-                        :aria-label="canWrite ? `Modifier ${slot.subject}` : undefined"
-                        @click="openEdit(slot)"
-                    >
-                        <span class="nu text-[12px] font-bold tabular-nums w-[92px] shrink-0" style="color: var(--navy)">
-                            {{ hhmm(slot.startTime) }} – {{ hhmm(slot.endTime) }}
-                        </span>
-                        <div class="nm flex-1 min-w-0">
-                            <b>{{ slot.subject }}</b>
-                            <span>
-                                {{ slot.teacherName ?? 'Enseignant à désigner'
-                                }}<template v-if="slot.room"> · {{ slot.room }}</template>
+                    <!-- Deux balises plutôt que <component :is="'button'"> : ce dernier se résout vers le
+                         Button de PrimeVue, enregistré globalement, et en prenait le fond vert. -->
+                    <template v-for="slot in day.slots" :key="slot.id">
+                        <button
+                            v-if="canWrite" type="button"
+                            class="flex items-center gap-3 px-3 py-2 w-full text-left"
+                            style="border-bottom: 1px solid var(--border)"
+                            :aria-label="`Modifier ${slot.subject}`" @click="openEdit(slot)"
+                        >
+                            <span class="nu text-[12px] font-bold tabular-nums w-[92px] shrink-0" style="color: var(--navy)">
+                                {{ hhmm(slot.startTime) }} – {{ hhmm(slot.endTime) }}
                             </span>
+                            <div class="nm flex-1 min-w-0">
+                                <b>{{ slot.subject }}</b>
+                                <span>
+                                    {{ slot.teacherName ?? 'Enseignant à désigner'
+                                    }}<template v-if="slot.room"> · {{ slot.room }}</template>
+                                </span>
+                            </div>
+                        </button>
+                        <div
+                            v-else class="flex items-center gap-3 px-3 py-2"
+                            style="border-bottom: 1px solid var(--border)"
+                        >
+                            <span class="nu text-[12px] font-bold tabular-nums w-[92px] shrink-0" style="color: var(--navy)">
+                                {{ hhmm(slot.startTime) }} – {{ hhmm(slot.endTime) }}
+                            </span>
+                            <div class="nm flex-1 min-w-0">
+                                <b>{{ slot.subject }}</b>
+                                <span>
+                                    {{ slot.teacherName ?? 'Enseignant à désigner'
+                                    }}<template v-if="slot.room"> · {{ slot.room }}</template>
+                                </span>
+                            </div>
                         </div>
-                    </component>
+                    </template>
                 </div>
             </div>
         </div>
