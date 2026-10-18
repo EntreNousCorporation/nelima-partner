@@ -83,6 +83,11 @@ export const PAYMENT_STATUSES: { value: PaymentStatus; label: string; tone: 'ok'
 ];
 
 export type StudentStats = {
+    academicYearId?: string | null;
+    academicYearLabel?: string | null;
+    /** Effectif de l'année précédente, s'il y en a une avec des inscrits. */
+    previousYearTotal?: number | null;
+    totalDeltaPercent?: number | null;
     total: number;
     newThisMonth: number;
     incompleteDossier: number;
@@ -104,6 +109,8 @@ export type StudentStats = {
 export type StudentFilters = {
     levelOfStudies?: string[]; keyword?: string; schoolClassId?: string; unassignedOnly?: boolean;
     paymentStatus?: PaymentStatus; incompleteDossier?: boolean; gender?: Gender;
+    /** Année scolaire : seuls les élèves inscrits pour cette année. */
+    academicYearId?: string;
 };
 
 function filterQuery(params: StudentFilters) {
@@ -117,6 +124,7 @@ function filterQuery(params: StudentFilters) {
     if (params.paymentStatus) query.paymentStatus = params.paymentStatus;
     if (params.incompleteDossier !== undefined) query.incompleteDossier = params.incompleteDossier;
     if (params.gender) query.gender = params.gender;
+    if (params.academicYearId) query.academicYearId = params.academicYearId;
     return query;
 }
 
@@ -192,8 +200,8 @@ export function useStudents() {
     }
 
     /** Chiffres de tout l'effectif : cartes, graphiques et compteurs des onglets. */
-    function stats() {
-        return api<StudentStats>('/students/stats');
+    function stats(academicYearId?: string) {
+        return api<StudentStats>('/students/stats', { query: academicYearId ? { academicYearId } : {} });
     }
 
     /** Lien du fichier tableur : mêmes filtres que la liste, servi par le proxy avec la session. */

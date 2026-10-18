@@ -5,6 +5,7 @@ import {
     type StudentFilters, type StudentStats,
 } from '~/composables/useStudents';
 import { type SchoolClass } from '~/composables/useClasses';
+import { type AcademicYear } from '~/composables/useSettings';
 import type { DonutSegment } from '~/components/DonutChart.vue';
 import type { LevelBar } from '~/components/LevelBars.vue';
 import { useAuthStore } from '~/stores/auth';
@@ -25,7 +26,16 @@ const students = ref<Student[]>([]);
 const levelOptions = ref<LevelOfStudy[]>([]);
 const classOptions = ref<SchoolClass[]>([]);
 const stats = ref<StudentStats | null>(null);
-const academicYear = ref<string | null>(null);
+/**
+ * Années de l'école, et celle que l'écran décrit : l'année en cours par défaut.
+ *
+ * Un élève est inscrit pour une année ; changer d'année montre les inscrits de cette année-là, et
+ * les chiffres s'y rapportent. Sans année déclarée, l'écran porte sur tous les élèves.
+ */
+const years = ref<AcademicYear[]>([]);
+const selectedYear = ref('');
+const academicYear = computed(() =>
+    years.value.find((year) => year.id === selectedYear.value)?.label ?? null);
 const page = ref(0);
 const size = 20;
 const totalElements = ref(0);
@@ -58,6 +68,7 @@ const filters = computed<StudentFilters>(() => ({
         : selectedDossier.value === 'incomplete' ? true
             : selectedDossier.value === 'complete' ? false : undefined,
     gender: selectedGender.value || undefined,
+    academicYearId: selectedYear.value || undefined,
 }));
 
 const tabs = computed(() => [
@@ -257,7 +268,7 @@ async function load() {
 
 async function loadStats() {
     try {
-        stats.value = await fetchStats();
+        stats.value = await fetchStats(selectedYear.value || undefined);
     } catch {
         stats.value = null;
     }
@@ -332,26 +343,39 @@ watch([tab, selectedLevel, selectedClass, selectedStatus, selectedGender, select
     load();
 });
 
+// Une autre année : autres inscrits, autres chiffres. Ignoré tant que la page s'initialise : le
+// choix de l'année par défaut est suivi du premier chargement, inutile de le doubler.
+let initialized = false;
+watch(selectedYear, () => {
+    if (!initialized) return;
+    page.value = 0;
+    selected.clear();
+    refresh();
+});
+
 onMounted(async () => {
     // La barre supérieure envoie ici avec sa recherche : la reprendre évite de la retaper.
     const requested = useRoute().query.q;
     if (typeof requested === 'string' && requested) keyword.value = requested;
 
-    // Chargés ensemble : aucun n'a besoin d'un autre, et les enchaîner faisait attendre la liste
-    // derrière des menus déroulants — la somme des allers-retours au lieu du plus long.
-    await Promise.all([
+    // La liste et les chiffres portent sur une année : celle-ci se connaît d'abord. Les menus
+    // déroulants, eux, partent tout de suite et en parallèle.
+    const menus = Promise.all([
         establishmentLevels(auth.user?.establishmentId)
             .then((levels) => { levelOptions.value = levels; })
             .catch(() => { levelOptions.value = []; }),
         useClasses().list()
             .then((classes) => { classOptions.value = classes; })
             .catch(() => { classOptions.value = []; }),
-        useSettings().years()
-            .then((years) => { academicYear.value = years.find((year) => year.active)?.label ?? null; })
-            .catch(() => { academicYear.value = null; }),
-        load(),
-        loadStats(),
     ]);
+    try {
+        years.value = await useSettings().years();
+    } catch {
+        years.value = [];
+    }
+    selectedYear.value = years.value.find((year) => year.active)?.id ?? '';
+    await Promise.all([menus, load(), loadStats()]);
+    initialized = true;
 });
 </script>
 
@@ -363,6 +387,14 @@ onMounted(async () => {
                    academicYear ? `année ${academicYear}` : null].filter(Boolean).join(' · ')"
         >
             <template #actions>
+                <label v-if="years.length > 1" class="inp">
+                    <BoIcon name="calendar" :size="15" />
+                    <select v-model="selectedYear" aria-label="Année scolaire">
+                        <option v-for="year in years" :key="year.id" :value="year.id">
+                            {{ year.label }}{{ year.active ? ' (en cours)' : '' }}
+                        </option>
+                    </select>
+                </label>
                 <button class="btn-secondary" @click="showImport = !showImport; showForm = false">
                     <BoIcon :name="showImport ? 'close' : 'download'" :size="16" />
                     {{ showImport ? 'Annuler' : 'Importer' }}
@@ -490,7 +522,13 @@ onMounted(async () => {
                     label="Effectif total" icon="students" tone="var(--brand-600)" soft="var(--brand-50)"
                     tip="Élèves inscrits dans l'établissement, affectés à une classe ou non."
                     :value="fmt(stats.total)"
-                    :foot="`${stats.classCount} classe${stats.classCount > 1 ? 's' : ''} ouverte${stats.classCount > 1 ? 's' : ''}`"
+                    :foot="stats.totalDeltaPercent != null
+                        ? `${stats.totalDeltaPercent >= 0 ? '+' : ''}${String(stats.totalDeltaPercent).replace('.', ',')} % vs N-1`
+                        : `${stats.classCount} classe${stats.classCount > 1 ? 's' : ''} ouverte${stats.classCount > 1 ? 's' : ''}`"
+                    :foot-tone="stats.totalDeltaPercent == null ? undefined
+                        : stats.totalDeltaPercent >= 0 ? 'var(--success)' : 'var(--danger)'"
+                    :foot-icon="stats.totalDeltaPercent == null ? undefined
+                        : stats.totalDeltaPercent >= 0 ? 'trend-up' : 'trend-down'"
                 />
                 <StatTile
                     label="Nouveaux inscrits" icon="clipboard" tone="var(--brand-600)" soft="var(--brand-50)"
