@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatAmount, formatDate, studentOf, type Installment } from '~/composables/useBilling';
+import { formatAmount, formatDate, installmentLabel, studentOf, type Installment } from '~/composables/useBilling';
 import {
     DEFAULT_TEMPLATE, REMINDER_CHANNELS, TEMPLATE_VARIABLES, reminderChannelLabel,
     type ReminderCampaign, type ReminderChannel, type ReminderTarget, type ReminderTargetCount,
@@ -348,7 +348,7 @@ onMounted(async () => {
                                 </div>
                             </td>
                             <td class="text-[12.5px]" style="color: var(--text-muted)">
-                                {{ row.label ?? '—' }}
+                                {{ installmentLabel(row) }}
                             </td>
                             <td class="nu text-[12.5px]" style="color: var(--text-muted)">
                                 {{ formatDate(row.dueDate) }}

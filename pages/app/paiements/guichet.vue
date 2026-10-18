@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import {
-    CHANNELS, channelLabel, formatAmount, formatDate, formatTime, studentOf,
+    CHANNELS, channelLabel, formatAmount, formatDate, formatTime, installmentLabel, studentOf,
     type Installment, type Receipt,
 } from '~/composables/useBilling';
 
 const { installments, collectOffline, receipts } = useBilling();
+const { search: searchStudents } = useStudents();
 
 const pending = ref<Installment[]>([]);
 const loading = ref(true);
@@ -59,12 +60,80 @@ function pickStudent(student: { name: string; matricule: string }) {
     query.value = student.name;
     // Une seule tranche due : la choisir d'office évite un clic qui n'apporte rien.
     selectedInstallment.value = dueOfStudent.value.length === 1 ? dueOfStudent.value[0] : null;
+    loadGuardians(student.matricule);
+}
+
+/* ---- Parents de l'élève retenu, proposés comme payeur ---- */
+type Payer = { name: string; email: string };
+const guardians = ref<Payer[]>([]);
+
+/**
+ * Les parents rattachés à l'élève, pour remplir « Personne qui règle » d'un clic.
+ *
+ * Un seul parent : il remplit les champs d'office, c'est presque toujours lui au comptoir. Plusieurs :
+ * rien n'est choisi à la place du caissier — un reçu au nom du mauvais parent est pire qu'un champ
+ * vide —, chacun est proposé en un bouton.
+ */
+async function loadGuardians(matricule: string) {
+    guardians.value = [];
+    try {
+        const page = await searchStudents({ page: 0, size: 5, keyword: matricule });
+        const student = (page.content ?? []).find((s) => s.registrationNumber === matricule);
+        guardians.value = (student?.parentUsers ?? []).map((g) => {
+            const contacts = g.contacts ?? [];
+            const email = contacts.find((c) => c.type === 'EMAIL' && c.isPrimary)
+                ?? contacts.find((c) => c.type === 'EMAIL');
+            return {
+                name: `${g.firstName ?? ''} ${g.lastName ?? ''}`.trim() || g.username || '',
+                email: email?.value ?? '',
+            };
+        }).filter((g) => g.name);
+    } catch {
+        // Sans droit de lecture sur les élèves, le caissier saisit le payeur à la main.
+        return;
+    }
+    if (guardians.value.length === 1 && !payerName.value && !payerEmail.value) {
+        usePayer(guardians.value[0]);
+    }
+}
+
+function usePayer(payer: Payer) {
+    payerName.value = payer.name;
+    payerEmail.value = payer.email;
+}
+
+/**
+ * Arrivée depuis la fiche d'un élève : le formulaire s'ouvre sur lui.
+ *
+ * Ses tranches sont demandées à part, filtrées sur lui : la liste générale s'arrête à 200 tranches,
+ * et dans une grande école celles de cet élève n'y seraient pas forcément.
+ */
+const route = useRoute();
+const notice = ref('');
+
+async function preselectFromRoute() {
+    const studentId = typeof route.query.eleve === 'string' ? route.query.eleve : '';
+    if (!studentId) return;
+    try {
+        const own = (await installments({ status: 'PENDING', studentId, size: 200 })).content ?? [];
+        if (!own.length) {
+            notice.value = "Cet élève n'a aucune tranche en attente de règlement.";
+            return;
+        }
+        const known = new Set(pending.value.map((i) => i.id));
+        pending.value = [...pending.value, ...own.filter((i) => !known.has(i.id))];
+        pickStudent(studentOf(own[0]));
+    } catch {
+        notice.value = "Les tranches de cet élève n'ont pas pu être chargées.";
+    }
 }
 
 function reset() {
+    notice.value = '';
     query.value = '';
     selectedStudent.value = null;
     selectedInstallment.value = null;
+    guardians.value = [];
     reference.value = '';
     payerName.value = '';
     payerEmail.value = '';
@@ -136,7 +205,10 @@ async function load() {
     }
 }
 
-onMounted(load);
+onMounted(async () => {
+    await load();
+    await preselectFromRoute();
+});
 </script>
 
 <template>
@@ -150,6 +222,10 @@ onMounted(load);
         <PaymentsTabs />
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
+        <p
+            v-if="notice" class="mb-4 text-[12.5px] font-semibold" role="status"
+            style="color: var(--warning)"
+        >{{ notice }}</p>
 
         <div class="grid-12">
             <UiCard
@@ -242,7 +318,7 @@ onMounted(load);
                                     name="installment"
                                 />
                                 <div class="nm flex-1 min-w-0">
-                                    <b>{{ installment.label ?? 'Tranche' }}</b>
+                                    <b>{{ installmentLabel(installment) }}</b>
                                     <span class="nu">Échéance {{ formatDate(installment.dueDate) }}</span>
                                 </div>
                                 <b class="nu text-[12.5px]" style="color: var(--navy)">
@@ -277,9 +353,18 @@ onMounted(load);
                         <!-- Le reçu part toujours au tuteur enregistré ; ces champs servent au cas
                              où quelqu'un d'autre se présente au comptoir. -->
                         <p class="text-[12px] mb-2.5" style="color: var(--text-faint)">
-                            Le reçu part au tuteur de l'élève. Renseignez ces champs si un tiers
-                            règle : le reçu portera son nom et lui sera également envoyé.
+                            Le reçu part au tuteur de l'élève et portera le nom indiqué ici. Si
+                            un tiers règle, saisissez le sien : le reçu lui sera aussi envoyé.
                         </p>
+                        <div v-if="guardians.length > 1" class="flex flex-wrap items-center gap-2 mb-2.5">
+                            <span class="text-[12px]" style="color: var(--text-faint)">Parent :</span>
+                            <button
+                                v-for="g in guardians" :key="g.name + g.email" type="button"
+                                class="btn-secondary btn-sm"
+                                :aria-pressed="payerName === g.name"
+                                @click="usePayer(g)"
+                            >{{ g.name }}</button>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             <input
                                 v-model="payerName" type="text" class="input" placeholder="Nom"

@@ -150,6 +150,14 @@ function guardianName(g: Guardian): string {
     return full || g.username || '—';
 }
 
+/**
+ * Ouvre le guichet sur cet élève : sa recherche faite, sa tranche choisie s'il n'en a qu'une, son
+ * parent proposé comme payeur. Seul l'identifiant passe dans l'adresse, rien de personnel.
+ */
+function openGuichet() {
+    navigateTo({ path: '/app/paiements/guichet', query: { eleve: shown.value.id } });
+}
+
 /** Coordonnées lisibles : téléphone principal d'abord, puis e-mail, à défaut l'identifiant. */
 function guardianContact(g: Guardian): string {
     const contacts = g.contacts ?? [];
@@ -387,10 +395,10 @@ onMounted(async () => {
         </p>
 
         <template #footer>
-            <NuxtLink to="/app/paiements/guichet" class="btn-primary flex-1">
+            <button type="button" class="btn-primary flex-1" @click="openGuichet">
                 <BoIcon name="cash" :size="16" />
                 Encaisser au guichet
-            </NuxtLink>
+            </button>
             <NuxtLink :to="`/app/paiements/recus?q=${student.registrationNumber}`" class="btn-secondary">
                 Ses reçus
             </NuxtLink>

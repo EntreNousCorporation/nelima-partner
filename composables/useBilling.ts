@@ -61,6 +61,19 @@ export function formatDate(value?: string) {
     return day.length === 3 ? `${day[2]}/${day[1]}/${day[0]}` : value;
 }
 
+/**
+ * Libellé complet d'une tranche : « Scolarité Maternelle - 1er versement ».
+ *
+ * Seul, « 1er versement » ne dit pas de quel frais il s'agit, et un élève en a souvent plusieurs
+ * qui se découpent pareil. Une tranche unique porte déjà le nom de son frais : on ne le répète pas.
+ */
+export function installmentLabel(installment: Installment) {
+    const fee = installment.studentFee?.fee?.name?.trim();
+    const label = installment.label?.trim();
+    if (fee && label && label !== fee) return `${fee} - ${label}`;
+    return fee || label || 'Tranche';
+}
+
 export function studentOf(installment: Installment) {
     const s = installment.studentFee?.student;
     if (!s) return { name: '—', matricule: '—' };
