@@ -66,7 +66,19 @@ export type Student = {
     overdueAmount?: number;
     /** Parents / tuteurs rattachés à l'élève (source : `parentUsers` de `/students/search`). */
     parentUsers?: Guardian[];
+    /** Photo d'identité courante ; nulle tant qu'aucune n'est versée au dossier. */
+    photoId?: string | null;
 };
+
+/**
+ * Adresse de la photo d'un élève, ou rien s'il n'en a pas.
+ *
+ * L'identifiant de la photo est dans l'adresse : le navigateur peut la garder en cache, et une
+ * nouvelle photo change l'adresse au lieu d'attendre l'expiration du cache.
+ */
+export function studentPhotoUrl(student?: { id: string; photoId?: string | null } | null) {
+    return student?.photoId ? `/api/v1/students/${student.id}/photo?v=${student.photoId}` : null;
+}
 
 export type Page<T> = {
     content: T[];

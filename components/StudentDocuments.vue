@@ -14,6 +14,8 @@ import {
  * la question qu'on se pose en ouvrant un dossier, avant même de regarder ce qu'il contient.
  */
 const props = defineProps<{ studentId: string }>();
+/** Photo courante après chaque chargement : l'avatar de la fiche et de la liste la suivent. */
+const emit = defineEmits<{ photo: [photoId: string | null] }>();
 
 const { documents, uploadDocument, removeDocument, documentUrl } = useStudents();
 const { can } = usePermissions();
@@ -43,6 +45,8 @@ async function load() {
     error.value = '';
     try {
         items.value = await documents(props.studentId);
+        // Le serveur retient la dernière photo versée ; la liste arrive déjà la plus récente en tête.
+        emit('photo', items.value.find((item) => item.kind === 'PHOTO')?.id ?? null);
     } catch (e: any) {
         error.value = e?.data?.debugMessage ?? "Le dossier n'a pas pu être chargé.";
     } finally {
@@ -83,7 +87,8 @@ async function submit() {
     }
     uploading.value = true;
     try {
-        await uploadDocument(props.studentId, kind.value, file.value, label.value.trim() || undefined);
+        const toSend = kind.value === 'PHOTO' ? await shrinkPhoto(file.value) : file.value;
+        await uploadDocument(props.studentId, kind.value, toSend, label.value.trim() || undefined);
         showForm.value = false;
         await load();
     } catch (e: any) {
@@ -103,6 +108,40 @@ async function remove(item: StudentDocument) {
         await load();
     } catch (e: any) {
         error.value = e?.data?.debugMessage ?? "La pièce n'a pas pu être supprimée.";
+    }
+}
+
+/**
+ * Ramène une photo d'identité à 800 pixels de côté au plus, en JPEG.
+ *
+ * Une photo de téléphone pèse 3 à 4 Mo, et c'est elle que les listes affichent en vignette : trente
+ * élèves par page se compteraient en centaines de mégaoctets sur une connexion mobile. 800 pixels
+ * suffisent largement à une photo d'identité, imprimée comprise. Le navigateur applique au passage
+ * l'orientation enregistrée par le téléphone, sans quoi la photo pourrait arriver couchée.
+ *
+ * En cas d'échec (format que le navigateur ne sait pas décoder), le fichier part tel quel : le
+ * serveur reste juge de ce qu'il accepte.
+ */
+async function shrinkPhoto(original: File): Promise<File> {
+    const MAX = 800;
+    try {
+        const bitmap = await createImageBitmap(original, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+        if (scale === 1 && original.size < 400 * 1024) {
+            bitmap.close();
+            return original;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+        if (!blob) return original;
+        const base = original.name.replace(/\.[^.]*$/, '') || 'photo';
+        return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+    } catch {
+        return original;
     }
 }
 

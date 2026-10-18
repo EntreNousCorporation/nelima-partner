@@ -29,6 +29,16 @@ const auth = useAuthStore();
  * tiroir ne se recharge pas d'elle-même, et lire la propriété afficherait la valeur d'avant.
  */
 const canWrite = computed(() => can('student:write'));
+
+/**
+ * La photo a changé dans le dossier : l'en-tête la montre aussitôt, et la liste d'où l'on vient est
+ * rechargée pour que la vignette suive. Rien à faire au premier chargement, où elle est déjà juste.
+ */
+function onPhoto(photoId: string | null) {
+    if ((shown.value.photoId ?? null) === photoId) return;
+    shown.value = { ...shown.value, photoId };
+    emit('updated');
+}
 const editing = ref(false);
 const saving = ref(false);
 const editError = ref('');
@@ -172,7 +182,7 @@ onMounted(async () => {
         @close="$emit('close')"
     >
         <template #avatar>
-            <AvatarBadge :name="`${shown.firstName} ${shown.lastName}`" :size="42" />
+            <AvatarBadge :name="`${shown.firstName} ${shown.lastName}`" :src="studentPhotoUrl(shown)" :size="42" />
         </template>
 
         <div
@@ -307,7 +317,7 @@ onMounted(async () => {
             Aucun parent rattaché à cet élève pour le moment.
         </p>
 
-        <StudentDocuments :student-id="student.id" />
+        <StudentDocuments :student-id="student.id" @photo="onPhoto" />
 
         <p class="sec">Échéancier</p>
         <div v-if="loading" class="flex flex-col gap-2.5 mb-5">

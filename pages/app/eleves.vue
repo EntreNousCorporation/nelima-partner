@@ -535,7 +535,7 @@ onMounted(async () => {
                             </td>
                             <td>
                                 <div class="flex items-center gap-2.5">
-                                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="28" />
+                                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :src="studentPhotoUrl(student)" :size="28" />
                                     <div class="nm min-w-0">
                                         <b>{{ student.lastName }} {{ student.firstName }}</b>
                                         <span class="nu">{{ formatDate(student.birthDay) }}</span>

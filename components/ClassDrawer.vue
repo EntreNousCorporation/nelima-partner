@@ -252,7 +252,10 @@ onMounted(loadMembers);
                     style="border-bottom: 1px solid var(--border)"
                     :disabled="working" @click="add(candidate)"
                 >
-                    <AvatarBadge :name="`${candidate.firstName} ${candidate.lastName}`" :size="26" />
+                    <AvatarBadge
+                        :name="`${candidate.firstName} ${candidate.lastName}`"
+                        :src="studentPhotoUrl(candidate)" :size="26"
+                    />
                     <div class="nm flex-1 min-w-0">
                         <b>{{ candidate.lastName }} {{ candidate.firstName }}</b>
                         <span class="nu">
@@ -292,7 +295,10 @@ onMounted(loadMembers);
                     class="flex items-center gap-2.5 px-3 py-2"
                     style="border-bottom: 1px solid var(--border)"
                 >
-                    <AvatarBadge :name="`${student.firstName} ${student.lastName}`" :size="26" tone="mute" />
+                    <AvatarBadge
+                        :name="`${student.firstName} ${student.lastName}`"
+                        :src="studentPhotoUrl(student)" :size="26" tone="mute"
+                    />
                     <div class="nm flex-1 min-w-0">
                         <b>{{ student.lastName }} {{ student.firstName }}</b>
                         <span class="nu">{{ student.registrationNumber }}</span>

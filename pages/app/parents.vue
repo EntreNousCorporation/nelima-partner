@@ -239,7 +239,10 @@ onMounted(async () => {
                     class="flex items-center gap-3 px-3 py-2.5"
                     style="border-bottom: 1px solid var(--border)"
                 >
-                    <AvatarBadge :name="`${child.firstName} ${child.lastName}`" :size="28" />
+                    <AvatarBadge
+                        :name="`${child.firstName} ${child.lastName}`"
+                        :src="studentPhotoUrl(child)" :size="28"
+                    />
                     <div class="nm flex-1 min-w-0">
                         <b>{{ child.lastName }} {{ child.firstName }}</b>
                         <span class="nu">

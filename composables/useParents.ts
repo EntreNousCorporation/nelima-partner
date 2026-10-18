@@ -14,6 +14,7 @@ export type ParentChild = {
     className?: string;
     levelLabel?: string;
     establishmentName?: string;
+    photoId?: string | null;
 };
 
 /**

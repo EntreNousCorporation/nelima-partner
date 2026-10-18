@@ -1,6 +1,9 @@
 <script setup lang="ts">
 /**
- * Pastille d'initiales, à la place d'une photo que l'école n'a pas.
+ * Pastille d'initiales, à la place d'une photo que l'école n'a pas — et la photo quand elle l'a.
+ *
+ * La photo ne remplace les initiales qu'une fois chargée : une image cassée (fichier retiré,
+ * session expirée) laisse les initiales, jamais une icône d'image brisée dans une liste.
  *
  * La couleur est **déduite du nom**, pas tirée au sort ni stockée : la même personne garde la
  * sienne d'un écran à l'autre et d'une session à l'autre. C'est ce qui rend une liste parcourable
@@ -20,6 +23,8 @@ const props = withDefaults(
          * Par défaut, la teinte se déduit du nom.
          */
         tone?: string;
+        /** Photo de la personne ; sans elle, ou si elle ne se charge pas, les initiales. */
+        src?: string | null;
     }>(),
     { size: 30 },
 );
@@ -31,6 +36,10 @@ const TONES = [
 ];
 
 const muted = computed(() => props.tone === 'mute');
+
+const failed = ref(false);
+watch(() => props.src, () => { failed.value = false; });
+const showPhoto = computed(() => !!props.src && !failed.value);
 
 const initials = computed(() => (props.name ?? '').split(' ').filter(Boolean).slice(0, 2)
     .map((part) => part[0]?.toUpperCase()).join('') || '—');
@@ -55,5 +64,11 @@ const style = computed(() => ({
 </script>
 
 <template>
-    <span class="avatar" :style="style">{{ initials }}</span>
+    <span class="avatar overflow-hidden" :style="style">
+        <img
+            v-if="showPhoto" :src="src!" alt="" loading="lazy" decoding="async"
+            class="w-full h-full object-cover" @error="failed = true"
+        />
+        <template v-else>{{ initials }}</template>
+    </span>
 </template>
