@@ -202,10 +202,14 @@ onMounted(async () => {
 
         <div class="flex items-center justify-between">
             <p class="sec">État civil</p>
+            <!-- Bouton plein, comme sur la maquette du client : en fantôme, « Modifier » se
+                 confondait avec les libellés gris et passait inaperçu. -->
             <button
-                v-if="canWrite && !editing" class="btn-ghost btn-sm mb-2"
+                v-if="canWrite && !editing" class="btn-primary btn-sm mb-2"
                 @click="openEdit"
-            >Modifier</button>
+            >
+                <BoIcon name="edit" :size="14" /> Mettre à jour les informations
+            </button>
         </div>
 
         <!-- En lecture : la fiche telle qu'elle est. -->

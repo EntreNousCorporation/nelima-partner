@@ -40,6 +40,10 @@
     --text: #17304F;
     --text-muted: #5A6B82;
     --text-faint: #8A99AD;
+    /* Sous-titres de page et libellés de panneau : plus soutenus que --text-faint, trop pâle
+       pour ce qu'ils portent (l'établissement, la période, le nom de l'indicateur). */
+    --text-subtitle: #042D63;
+    --text-label: #505F73;
 
     /* Couleurs de sens, réservées aux états : jamais employées pour décorer. */
     --success: #12996A;
@@ -76,6 +80,8 @@
         --text: #e8edf5;
         --text-muted: #9aa8bd;
         --text-faint: #6f7f96;
+        --text-subtitle: #b4c2d6;
+        --text-label: #9aa8bd;
 
         --success: #4ac48b;
         --success-solid: #1FCC85;
@@ -130,7 +136,7 @@
 
     .page-subtitle {
         @apply text-sm mt-1;
-        color: var(--text-muted);
+        color: var(--text-subtitle);
     }
 
     .section-title {
@@ -663,7 +669,7 @@
     .kpi-label {
         @apply flex items-center gap-1.5 text-[11px] font-bold uppercase;
         letter-spacing: .06em;
-        color: var(--text-faint);
+        color: var(--text-label);
     }
 
     .kpi-value {
@@ -848,7 +854,7 @@
     .sec {
         @apply text-[11px] font-bold uppercase mb-2.5;
         letter-spacing: .08em;
-        color: var(--text-faint);
+        color: var(--text-label);
     }
 
     .kv {

@@ -53,6 +53,7 @@ const form = reactive({
 });
 
 const canWrite = computed(() => can('staff:write'));
+const route = useRoute();
 const canReadSalary = computed(() => can('staff:read_salary'));
 const canPoint = computed(() => can('attendance:write'));
 
@@ -332,6 +333,9 @@ onMounted(async () => {
         classes.value = [];
     }
     await load();
+    // Arrivée depuis le formulaire d'une classe sans enseignant à désigner : le formulaire d'ajout
+    // s'ouvre directement, rôle Enseignant déjà choisi.
+    if (route.query.ajout === 'enseignant' && canWrite.value) openCreate();
 });
 </script>
 

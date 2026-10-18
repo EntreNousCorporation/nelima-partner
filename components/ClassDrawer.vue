@@ -65,6 +65,21 @@ function printRoster() {
 
 const members = ref<Student[]>([]);
 const loading = ref(true);
+
+/*
+ * La classe entière est chargée — la liste imprimable en a besoin — mais le tiroir n'en montre
+ * qu'une page : trente noms d'affilée repoussaient le pied du tiroir hors de l'écran.
+ */
+const PAGE_SIZE = 10;
+const memberPage = ref(0);
+const memberPages = computed(() => Math.max(1, Math.ceil(members.value.length / PAGE_SIZE)));
+const visibleMembers = computed(() =>
+    members.value.slice(memberPage.value * PAGE_SIZE, (memberPage.value + 1) * PAGE_SIZE));
+
+// Retirer le dernier élève d'une page ne doit pas laisser l'écran sur une page vide.
+watch(memberPages, (pages) => {
+    if (memberPage.value > pages - 1) memberPage.value = pages - 1;
+});
 const working = ref(false);
 const error = ref('');
 
@@ -256,7 +271,7 @@ onMounted(loadMembers);
         </div>
         <div v-else-if="members.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
             <div
-                v-for="student in members" :key="student.id"
+                v-for="student in visibleMembers" :key="student.id"
                 class="flex items-center gap-2.5 px-3 py-2"
                 style="border-bottom: 1px solid var(--border)"
             >
@@ -270,7 +285,29 @@ onMounted(loadMembers);
                 </button>
             </div>
         </div>
-        <p v-else class="text-[12.5px]" style="color: var(--text-faint)">
+        <div
+            v-if="!loading && memberPages > 1"
+            class="flex items-center justify-between mt-2.5"
+        >
+            <span class="text-[12px]" style="color: var(--text-faint)">
+                <b class="nu" style="color: var(--navy)">{{ memberPage * PAGE_SIZE + 1 }}–{{
+                    Math.min((memberPage + 1) * PAGE_SIZE, members.length) }}</b> sur
+                <b class="nu" style="color: var(--navy)">{{ members.length }}</b>
+            </span>
+            <span class="flex items-center gap-2">
+                <button class="btn-secondary btn-sm" :disabled="memberPage === 0" @click="memberPage--">
+                    Précédent
+                </button>
+                <span class="text-[12px]" style="color: var(--text-faint)">
+                    {{ memberPage + 1 }} / {{ memberPages }}
+                </span>
+                <button
+                    class="btn-secondary btn-sm" :disabled="memberPage >= memberPages - 1"
+                    @click="memberPage++"
+                >Suivant</button>
+            </span>
+        </div>
+        <p v-if="!loading && !members.length" class="text-[12.5px]" style="color: var(--text-faint)">
             Classe vide. Affectez-y des élèves depuis le champ ci-dessus.
         </p>
 

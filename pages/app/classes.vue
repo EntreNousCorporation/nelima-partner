@@ -288,8 +288,12 @@ onMounted(async () => {
                                 placeholder="Nom de l'enseignant" class="input"
                             />
                             <p class="text-[11.5px] mt-1" style="color: var(--text-faint)">
-                                Renseignez votre personnel pour désigner un titulaire au lieu de le
-                                saisir.
+                                Aucun enseignant dans votre personnel : ajoutez-en pour choisir le
+                                titulaire dans une liste.
+                                <NuxtLink
+                                    to="/app/personnel?ajout=enseignant" class="font-semibold underline"
+                                    style="color: var(--brand-700)"
+                                >Ajouter un enseignant</NuxtLink>
                             </p>
                         </template>
                     </div>
