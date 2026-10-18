@@ -62,22 +62,24 @@ export type AcademicPeriod = {
     position?: number;
 };
 
+/**
+ * Année scolaire de la plateforme, vue par l'école : ses trimestres et son état y sont propres.
+ *
+ * `active` désigne l'année en cours (la même pour toutes les écoles) ; `consulted`, celle que
+ * l'utilisateur a choisi d'afficher.
+ */
 export type AcademicYear = {
     id: string;
     label: string;
     startDate: string;
     endDate: string;
     active: boolean;
+    consulted: boolean;
+    status?: 'OPEN' | 'CLOSED' | null;
     periods: AcademicPeriod[];
 };
 
-export type AcademicYearForm = {
-    label: string;
-    startDate: string;
-    endDate: string;
-    active: boolean;
-    periods: { label: string; startDate: string; endDate: string }[];
-};
+export type AcademicPeriodForm = { label: string; startDate: string; endDate: string };
 
 export type NotificationEvent = 'RECEIPT_ISSUED' | 'INSTALLMENT_DUE_SOON' | 'INSTALLMENT_OVERDUE';
 export type NotificationChannel = 'PUSH' | 'EMAIL' | 'SMS';
@@ -162,16 +164,14 @@ export function useSettings() {
         return api<AcademicYear[]>('/academic-years');
     }
 
-    function createYear(body: AcademicYearForm) {
-        return api<AcademicYear>('/academic-years', { method: 'POST', body });
+    /** Les trimestres de l'école pour une année : ses dates à elle. */
+    function definePeriods(id: string, periods: AcademicPeriodForm[]) {
+        return api<AcademicYear>(`/academic-years/${id}/periods`, { method: 'PUT', body: periods });
     }
 
-    function updateYear(id: string, body: AcademicYearForm) {
-        return api<AcademicYear>(`/academic-years/${id}`, { method: 'PUT', body });
-    }
-
-    function removeYear(id: string) {
-        return api(`/academic-years/${id}`, { method: 'DELETE' });
+    /** L'année que l'utilisateur consulte ; sans identifiant, retour à l'année en cours. */
+    function consult(id?: string) {
+        return api('/academic-years/consulted', { method: 'PUT', query: id ? { academicYearId: id } : {} });
     }
 
     /* ---- Notifications ---- */
@@ -196,7 +196,7 @@ export function useSettings() {
 
     return {
         establishment, updateEstablishment,
-        years, createYear, updateYear, removeYear,
+        years, definePeriods, consult,
         notifications, setNotification,
         audit,
     };

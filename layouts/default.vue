@@ -86,6 +86,13 @@ function onKey(event: KeyboardEvent) {
 }
 
 onMounted(() => window.addEventListener('keydown', onKey));
+
+/*
+ * L'année consultée, rappelée en tête de chaque écran dès qu'elle n'est pas l'année en cours :
+ * des chiffres de l'an dernier pris pour ceux de cette année, c'est une mauvaise décision.
+ */
+const consultedYear = useConsultedYear();
+onMounted(() => { if (!consultedYear.loaded.value) consultedYear.refresh(); });
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 async function logout() {
@@ -197,6 +204,20 @@ async function logout() {
         </nav>
 
         <main class="flex-1 w-full max-w-[1620px] mx-auto p-5">
+            <div
+                v-if="consultedYear.elsewhere.value"
+                class="flex flex-wrap items-center gap-2 mb-4 px-3.5 py-2.5 rounded-[var(--radius)] text-[13px]"
+                style="background: var(--warning-soft); color: var(--warning); border: 1px solid var(--warning-solid)"
+                role="status"
+            >
+                <BoIcon name="calendar" :size="16" />
+                <span>
+                    Vous consultez l'année <b>{{ consultedYear.consulted.value?.label }}</b>
+                    <template v-if="consultedYear.consulted.value?.status === 'CLOSED'"> (clôturée, lecture seule)</template>.
+                    L'année en cours est {{ consultedYear.current.value?.label }}.
+                </span>
+                <NuxtLink to="/app/parametres?section=annee" class="font-semibold underline ml-auto">Changer</NuxtLink>
+            </div>
             <slot />
         </main>
     </div>

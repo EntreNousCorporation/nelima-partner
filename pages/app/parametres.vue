@@ -201,93 +201,69 @@ async function saveLevels() {
 
 /* ---------------- Année scolaire ---------------- */
 
-const years = ref<AcademicYear[]>([]);
-const editingYear = ref<AcademicYear | null>(null);
-const showYearForm = ref(false);
+/*
+ * Les années sont définies par la plateforme, communes à toutes les écoles. L'école y pose ses
+ * trimestres ; chaque utilisateur choisit l'année qu'il consulte, sans faire basculer ses
+ * collègues.
+ */
+const consultedYear = useConsultedYear();
+const years = consultedYear.years;
+const chosenYear = ref('');
+const switchingYear = ref(false);
+const editingPeriods = ref(false);
 const savingYear = ref(false);
-const yearForm = reactive({
-    label: '',
-    startDate: '',
-    endDate: '',
-    active: true,
-    periods: [] as { label: string; startDate: string; endDate: string }[],
-});
-
-const activeYear = computed(() => years.value.find((year) => year.active) ?? null);
+const periodsForm = ref<{ label: string; startDate: string; endDate: string }[]>([]);
 
 async function loadYears() {
+    await consultedYear.refresh();
+    chosenYear.value = consultedYear.consulted.value?.id ?? '';
+}
+
+/** Changer d'année recharge l'application : tous les écrans doivent la suivre, sans exception. */
+async function switchYear() {
+    if (!chosenYear.value || chosenYear.value === consultedYear.consulted.value?.id) return;
+    switchingYear.value = true;
     try {
-        years.value = await settings.years();
+        await settings.consult(chosenYear.value);
+        window.location.reload();
     } catch (e) {
-        fail(e, "Les années scolaires n'ont pas pu être chargées.");
+        fail(e, "L'année n'a pas pu être changée.");
+        switchingYear.value = false;
     }
 }
 
-function openYearCreate() {
-    editingYear.value = null;
-    const now = new Date();
-    Object.assign(yearForm, {
-        label: `${now.getFullYear()}-${now.getFullYear() + 1}`,
-        startDate: '', endDate: '', active: true, periods: [],
-    });
-    showYearForm.value = true;
-}
-
-function openYearEdit(year: AcademicYear) {
-    editingYear.value = year;
-    Object.assign(yearForm, {
-        label: year.label,
-        startDate: year.startDate,
-        endDate: year.endDate,
-        active: year.active,
-        periods: year.periods.map((period) => ({
-            label: period.label, startDate: period.startDate, endDate: period.endDate,
-        })),
-    });
-    showYearForm.value = true;
+function openPeriods() {
+    periodsForm.value = (consultedYear.consulted.value?.periods ?? []).map((period) => ({
+        label: period.label, startDate: period.startDate, endDate: period.endDate,
+    }));
+    editingPeriods.value = true;
 }
 
 function addPeriod() {
-    const rank = yearForm.periods.length + 1;
-    yearForm.periods.push({
+    const rank = periodsForm.value.length + 1;
+    periodsForm.value.push({
         label: `${rank === 1 ? '1er' : `${rank}e`} trimestre`,
         startDate: '', endDate: '',
     });
 }
 
 function removePeriod(index: number) {
-    yearForm.periods.splice(index, 1);
+    periodsForm.value.splice(index, 1);
 }
 
-async function submitYear() {
+async function submitPeriods() {
+    const year = consultedYear.consulted.value;
+    if (!year) return;
     savingYear.value = true;
     try {
-        const body = {
-            label: yearForm.label,
-            startDate: yearForm.startDate,
-            endDate: yearForm.endDate,
-            active: yearForm.active,
-            periods: yearForm.periods,
-        };
-        if (editingYear.value) await settings.updateYear(editingYear.value.id, body);
-        else await settings.createYear(body);
-        showYearForm.value = false;
+        await settings.definePeriods(year.id, periodsForm.value);
+        editingPeriods.value = false;
         await loadYears();
-        done('Année scolaire enregistrée.');
+        done('Trimestres enregistrés.');
     } catch (e) {
-        fail(e, "L'année scolaire n'a pas pu être enregistrée.");
+        fail(e, "Les trimestres n'ont pas pu être enregistrés.");
     } finally {
         savingYear.value = false;
-    }
-}
-
-async function destroyYear(year: AcademicYear) {
-    try {
-        await settings.removeYear(year.id);
-        await loadYears();
-        done('Année supprimée.');
-    } catch (e) {
-        fail(e, "L'année n'a pas pu être supprimée.");
     }
 }
 
@@ -547,74 +523,69 @@ onMounted(async () => {
                 <!-- ================= Année scolaire ================= -->
                 <template v-if="current === 'annee'">
                     <UiCard
-                        title="Année scolaire et périodes"
-                        sub="Les bornes de l'année active paraissent au calendrier de l'école et à celui des familles"
+                        title="Année consultée"
+                        sub="Tous vos écrans affichent cette année. Les autres utilisateurs ne sont pas concernés."
                     >
-                        <template #action>
-                            <button v-if="canWrite" class="btn-primary btn-sm" @click="openYearCreate">
-                                <BoIcon name="plus" :size="15" />
-                                Déclarer une année
+                        <div v-if="years.length" class="flex flex-wrap items-end gap-3">
+                            <div>
+                                <label class="field-label" for="consultedYear">Année</label>
+                                <select id="consultedYear" v-model="chosenYear" class="select">
+                                    <option v-for="year in years" :key="year.id" :value="year.id">
+                                        {{ year.label }}{{ year.active ? ' — en cours' : '' }}{{ year.status === 'CLOSED' ? ' — clôturée' : '' }}
+                                    </option>
+                                </select>
+                            </div>
+                            <button
+                                class="btn-primary" :disabled="switchingYear || chosenYear === consultedYear.consulted.value?.id"
+                                @click="switchYear"
+                            >
+                                {{ switchingYear ? 'Changement…' : 'Afficher cette année' }}
                             </button>
-                        </template>
-
-                        <p v-if="activeYear" class="text-[13px]">
-                            <b>Année en cours — {{ activeYear.label }}</b><br />
-                            Du {{ formatDay(activeYear.startDate) }} au
-                            {{ formatDay(activeYear.endDate) }} ·
-                            {{ activeYear.periods.length }} période(s)
-                        </p>
+                        </div>
                         <EmptyState
                             v-else
-                            title="Aucune année déclarée"
-                            text="Déclarez l'année en cours pour que ses bornes apparaissent au calendrier."
+                            title="Aucune année scolaire"
+                            text="Les années sont définies par l'équipe Nelima. Contactez-la si l'année en cours n'apparaît pas."
                         />
                     </UiCard>
 
-                    <UiCard v-if="showYearForm" :title="editingYear ? `Modifier ${editingYear.label}` : 'Nouvelle année scolaire'">
-                        <form @submit.prevent="submitYear">
-                            <div class="grid gap-3.5 sm:grid-cols-3">
-                                <div>
-                                    <label class="field-label" for="yearLabel">Libellé</label>
-                                    <input
-                                        id="yearLabel" v-model="yearForm.label" type="text" required
-                                        placeholder="2025-2026" class="input"
-                                    />
-                                </div>
-                                <div>
-                                    <label class="field-label" for="yearStart">Début</label>
-                                    <NelimaDateField id="yearStart" v-model="yearForm.startDate"
-                                        required />
-                                </div>
-                                <div>
-                                    <label class="field-label" for="yearEnd">Fin</label>
-                                    <NelimaDateField id="yearEnd" v-model="yearForm.endDate" required />
-                                </div>
-                            </div>
+                    <UiCard
+                        v-if="consultedYear.consulted.value"
+                        :title="`Trimestres ${consultedYear.consulted.value.label}`"
+                        sub="Les dates de votre école : elles paraissent au calendrier de l'école et à celui des familles"
+                    >
+                        <template #action>
+                            <button v-if="canWrite && !editingPeriods" class="btn-secondary btn-sm" @click="openPeriods">
+                                <BoIcon name="edit" :size="15" /> Modifier
+                            </button>
+                        </template>
 
-                            <label class="flex items-center gap-2 text-[12.5px] mt-4">
-                                <input v-model="yearForm.active" type="checkbox" />
-                                Année en cours
-                                <span style="color: var(--text-faint)">
-                                    (l'activer désactive la précédente)
-                                </span>
-                            </label>
-
-                            <p class="sec mt-4">Périodes</p>
-                            <p class="hint mb-2">
-                                Trimestres ou semestres, autant que l'école en tient. Chaque période
-                                pose deux repères au calendrier : son début et sa fin.
+                        <template v-if="!editingPeriods">
+                            <p class="text-[13px]">
+                                Année du {{ formatDay(consultedYear.consulted.value.startDate) }} au
+                                {{ formatDay(consultedYear.consulted.value.endDate) }}
                             </p>
+                            <ul v-if="consultedYear.consulted.value.periods.length" class="mt-2 text-[13px]">
+                                <li v-for="period in consultedYear.consulted.value.periods" :key="period.id">
+                                    <b>{{ period.label }}</b> — du {{ formatDay(period.startDate) }} au {{ formatDay(period.endDate) }}
+                                </li>
+                            </ul>
+                            <p v-else class="hint mt-2">
+                                Aucun trimestre saisi : seules la rentrée et la fin d'année paraissent au calendrier.
+                            </p>
+                        </template>
 
+                        <form v-else @submit.prevent="submitPeriods">
+                            <p class="hint mb-2">
+                                Trimestres ou semestres, autant que l'école en tient, dans les bornes de l'année.
+                            </p>
                             <div
-                                v-for="(period, index) in yearForm.periods" :key="index"
+                                v-for="(period, index) in periodsForm" :key="index"
                                 class="grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto] items-end mb-2"
                             >
                                 <div>
                                     <label class="field-label">Libellé</label>
-                                    <input
-                                        v-model="period.label" type="text" required
-                                        placeholder="1er trimestre" class="input"
-                                    />
+                                    <input v-model="period.label" type="text" required placeholder="1er trimestre" class="input" />
                                 </div>
                                 <div>
                                     <label class="field-label">Début</label>
@@ -624,38 +595,33 @@ onMounted(async () => {
                                     <label class="field-label">Fin</label>
                                     <NelimaDateField v-model="period.endDate" required />
                                 </div>
-                                <button
-                                    type="button" class="btn-ghost btn-sm" @click="removePeriod(index)"
-                                >Retirer</button>
+                                <button type="button" class="btn-ghost btn-sm" @click="removePeriod(index)">Retirer</button>
                             </div>
-
                             <button type="button" class="btn-secondary btn-sm" @click="addPeriod">
-                                <BoIcon name="plus" :size="15" />
-                                Ajouter une période
+                                <BoIcon name="plus" :size="15" /> Ajouter une période
                             </button>
-
                             <div class="flex gap-2 mt-4">
                                 <button type="submit" class="btn-primary" :disabled="savingYear">
                                     <BoIcon name="check" :size="16" />
                                     {{ savingYear ? 'Enregistrement…' : 'Enregistrer' }}
                                 </button>
-                                <button
-                                    type="button" class="btn-secondary" @click="showYearForm = false"
-                                >Annuler</button>
+                                <button type="button" class="btn-secondary" @click="editingPeriods = false">Annuler</button>
                             </div>
                         </form>
                     </UiCard>
 
-                    <UiCard v-if="years.length" title="Années déclarées" :pad="false">
+                    <UiCard
+                        v-if="years.length" title="Années scolaires" sub="Définies par la plateforme Nelima, communes à toutes les écoles"
+                        :pad="false"
+                    >
                         <table class="table">
                             <thead>
                                 <tr>
                                     <th>Année</th>
                                     <th>Du</th>
                                     <th>Au</th>
-                                    <th>Périodes</th>
+                                    <th>Vos trimestres</th>
                                     <th>Statut</th>
-                                    <th />
                                 </tr>
                             </thead>
                             <tbody>
@@ -664,27 +630,13 @@ onMounted(async () => {
                                     <td>{{ formatDay(year.startDate) }}</td>
                                     <td>{{ formatDay(year.endDate) }}</td>
                                     <td>
-                                        <span v-if="!year.periods.length" style="color: var(--text-faint)">
-                                            aucune
-                                        </span>
-                                        <span v-else>
-                                            {{ year.periods.map((p) => p.label).join(' · ') }}
-                                        </span>
+                                        <span v-if="!year.periods.length" style="color: var(--text-faint)">aucun</span>
+                                        <span v-else>{{ year.periods.map((p) => p.label).join(' · ') }}</span>
                                     </td>
-                                    <td>
-                                        <UiPill :tone="year.active ? 'ok' : 'mute'">
-                                            {{ year.active ? 'En cours' : 'Archivée' }}
-                                        </UiPill>
-                                    </td>
-                                    <td class="text-right">
-                                        <button
-                                            v-if="canWrite" class="btn-ghost btn-sm"
-                                            @click="openYearEdit(year)"
-                                        ><BoIcon name="edit" :size="15" />Modifier</button>
-                                        <button
-                                            v-if="canWrite && !year.active" class="btn-ghost btn-sm"
-                                            @click="destroyYear(year)"
-                                        >Supprimer</button>
+                                    <td class="flex gap-1.5">
+                                        <UiPill v-if="year.active" tone="ok">En cours</UiPill>
+                                        <UiPill v-if="year.status === 'CLOSED'" tone="mute">Clôturée</UiPill>
+                                        <UiPill v-if="year.consulted" tone="info">Affichée</UiPill>
                                     </td>
                                 </tr>
                             </tbody>
