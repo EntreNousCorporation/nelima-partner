@@ -23,6 +23,8 @@ export type Establishment = {
     /** L'adresse se lit imbriquée mais s'écrit à plat, en `addressName`. */
     address?: { id?: string; name?: string };
     contacts: EstablishmentContact[];
+    /** Lien public du logo, servi par storage.nelima.ci. */
+    logo?: string | null;
 };
 
 /**
@@ -40,6 +42,8 @@ export type EstablishmentUpdateForm = {
     webSite?: string;
     addressName?: string;
     contacts?: { id?: string; type: 'EMAIL' | 'PHONE_NUMBER'; value: string; isPrimary?: boolean }[];
+    /** Nouveau logo, en base64 brut (sans le préfixe `data:`). */
+    coverImage?: { name: string; base64: string; extension: string };
 };
 
 /** Le contact principal d'un type, tel qu'il est enregistré — `id` compris. */

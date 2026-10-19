@@ -6,7 +6,8 @@
     "dev": "nuxt dev",
     "build": "nuxt build && node scripts/link-public-assets.mjs",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxi typecheck"
   },
   "dependencies": {
     "@nuxtjs/i18n": "^9.1.1",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@nuxtjs/tailwindcss": "6.12.2",
     "tailwindcss-primeui": "^0.6.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.9.3",
+    "vue-tsc": "^2.2.12"
   }
 }

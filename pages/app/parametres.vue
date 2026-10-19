@@ -144,6 +144,75 @@ async function submitIdentity() {
     }
 }
 
+/* ---------------- Logo ---------------- */
+
+/**
+ * Le logo de l'établissement, l'image qui le représente dans Nelima.
+ *
+ * L'image est réduite dans le navigateur (512 px au plus, PNG) avant l'envoi : une photo de
+ * téléphone pèse plusieurs mégaoctets pour un affichage de quelques dizaines de pixels, et le
+ * passage par un canevas retire au passage les métadonnées (position GPS comprise).
+ */
+const LOGO_MAX = 512;
+const logoInput = ref<HTMLInputElement | null>(null);
+const logoPreview = ref<string | null>(null);
+const savingLogo = ref(false);
+const logoError = ref('');
+
+function readImage(file: File) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+        image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image illisible')); };
+        image.src = url;
+    });
+}
+
+async function onLogoChosen(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    (event.target as HTMLInputElement).value = '';
+    logoError.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+        logoError.value = 'Choisissez une image PNG, JPEG ou WebP.';
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        logoError.value = 'Cette image dépasse 10 Mo.';
+        return;
+    }
+    try {
+        const image = await readImage(file);
+        const scale = Math.min(1, LOGO_MAX / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+        logoPreview.value = canvas.toDataURL('image/png');
+    } catch {
+        logoError.value = "Cette image n'a pas pu être lue.";
+    }
+}
+
+async function saveLogo() {
+    if (!logoPreview.value || !establishment.value) return;
+    savingLogo.value = true;
+    try {
+        await settings.updateEstablishment(establishmentId.value, {
+            name: establishment.value.name,
+            coverImage: { name: 'logo.png', base64: logoPreview.value.split(',')[1] ?? '', extension: 'png' },
+        });
+        logoPreview.value = null;
+        await loadEstablishment();
+        done('Logo enregistré.');
+    } catch (e) {
+        fail(e, "Le logo n'a pas pu être enregistré.");
+    } finally {
+        savingLogo.value = false;
+    }
+}
+
 /* ---------------- Niveaux enseignés ---------------- */
 
 /**
@@ -417,6 +486,41 @@ onMounted(async () => {
                          vivaient hors du formulaire : le bouton tombait donc au milieu de l'écran,
                          au-dessus de champs qu'il enregistre pourtant. On voyait « Enregistrer »,
                          puis deux champs de plus, et rien pour les valider. -->
+                    <UiCard title="Logo" sub="L'image qui représente l'établissement dans Nelima">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div
+                                class="grid place-items-center shrink-0 overflow-hidden"
+                                style="width: 96px; height: 96px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface-sunken)"
+                            >
+                                <img
+                                    v-if="logoPreview || establishment?.logo" :src="logoPreview ?? establishment?.logo ?? undefined"
+                                    alt="Logo de l'établissement" style="max-width: 100%; max-height: 100%; object-fit: contain"
+                                />
+                                <BoIcon v-else name="building" :size="32" style="color: var(--text-faint)" />
+                            </div>
+                            <div class="flex flex-col gap-2 min-w-0">
+                                <p class="hint" style="margin: 0">
+                                    PNG, JPEG ou WebP. L'image est réduite à 512 px ; un logo carré sur fond clair rend le mieux.
+                                </p>
+                                <p v-if="logoError" class="text-[12.5px]" style="color: var(--danger)" role="alert">{{ logoError }}</p>
+                                <div v-if="canWrite" class="flex flex-wrap gap-2">
+                                    <input ref="logoInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onLogoChosen" />
+                                    <button type="button" class="btn-secondary" @click="logoInput?.click()">
+                                        <BoIcon name="upload" :size="16" />
+                                        {{ establishment?.logo || logoPreview ? 'Changer le logo' : 'Choisir une image' }}
+                                    </button>
+                                    <template v-if="logoPreview">
+                                        <button type="button" class="btn-primary" :disabled="savingLogo" @click="saveLogo">
+                                            <BoIcon name="check" :size="16" />
+                                            {{ savingLogo ? 'Enregistrement…' : 'Enregistrer le logo' }}
+                                        </button>
+                                        <button type="button" class="btn-ghost" @click="logoPreview = null">Annuler</button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </UiCard>
+
                     <form class="contents" @submit.prevent="submitIdentity">
                         <UiCard
                             title="Identité de l'établissement"

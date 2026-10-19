@@ -82,6 +82,7 @@ export default defineEventHandler(async (event) => {
         user,
         accessToken,
         accessExpiresAt: login._data.expired_at,
+        profileCheckedAt: Date.now(),
     });
 
     return { user };

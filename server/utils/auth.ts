@@ -26,6 +26,8 @@ export type SessionData = {
     user?: SchoolUser;
     accessToken?: string;
     accessExpiresAt?: number;
+    /** Dernière relecture du profil auprès du backend (ms depuis l'époque). */
+    profileCheckedAt?: number;
 };
 
 const SESSION_COOKIE_NAME = 'nelima_portal_session';
