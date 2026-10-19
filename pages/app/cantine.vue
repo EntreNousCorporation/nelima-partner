@@ -553,7 +553,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
             </div>
             <div v-if="!loading && !filtered.length" class="empty">
                 <h4>Aucun inscrit</h4>
-                <p>Inscrivez les élèves à la cantine avec le bouton « Inscrire un élève ».</p>
+                <p>Inscrivez les élèves à la cantine avec le bouton « Inscrire un élève ».</p>
             </div>
             <div class="card-f">
                 <span style="font: 500 12px / 1 Inter; color: var(--tx3)">
@@ -607,7 +607,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                             <div class="fld"><label for="menu-starter">Entrée *</label><input id="menu-starter" v-model="editedDay.starter" placeholder="Ex. Salade de crudités" maxlength="128" /></div>
                             <div class="fld"><label for="menu-dessert">Dessert *</label><input id="menu-dessert" v-model="editedDay.dessert" placeholder="Ex. Fruit de saison" maxlength="128" /></div>
                             <div class="fld" style="grid-column: span 2"><label for="menu-main">Plat principal *</label><input id="menu-main" v-model="editedDay.mainCourse" placeholder="Ex. Riz sauce arachide, poulet" maxlength="128" /></div>
-                            <div class="fld" style="grid-column: span 2"><label for="menu-veg">Alternative végétarienne</label><input id="menu-veg" v-model="editedDay.vegetarianAlternative" placeholder="Servie aux élèves inscrits « Végétarien »" maxlength="128" /></div>
+                            <div class="fld" style="grid-column: span 2"><label for="menu-veg">Alternative végétarienne</label><input id="menu-veg" v-model="editedDay.vegetarianAlternative" placeholder="Servie aux élèves inscrits « Végétarien »" maxlength="128" /></div>
                         </div>
                         <div style="margin: 16px 0 0">
                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
@@ -689,7 +689,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                         <em class="nu">{{ fmt(f.monthlyPrice) }} F <small>/ mois</small></em>
                     </button>
                 </div>
-                <p v-else style="margin: 0; font: 500 12.5px / 1.45 Inter; color: var(--tx3)">Aucune formule : créez-en une avec « Gérer les formules ».</p>
+                <p v-else style="margin: 0; font: 500 12.5px / 1.45 Inter; color: var(--tx3)">Aucune formule : créez-en une avec « Gérer les formules ».</p>
                 <div class="frm" style="margin-top: 12px">
                     <div class="fld">
                         <label for="canteen-start">Premier repas</label>

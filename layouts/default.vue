@@ -205,7 +205,7 @@ async function logout() {
             </NuxtLink>
         </nav>
 
-        <main class="flex-1 w-full max-w-[1620px] mx-auto p-5">
+        <main class="flex-1 w-full max-w-[1620px] mx-auto p-[20px]">
             <div
                 v-if="consultedYear.elsewhere.value"
                 class="flex flex-wrap items-center gap-2 mb-4 px-3.5 py-2.5 rounded-[var(--radius)] text-[13px]"

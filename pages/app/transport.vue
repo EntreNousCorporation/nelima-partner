@@ -258,7 +258,7 @@ function toggleDocument(value: string) {
         ? driverForm.documents.filter((d) => d !== value) : [...driverForm.documents, value];
 }
 
-/** « KOFFI Jean-Marc » : le nom d'abord, en capitales, comme partout dans Nelima. */
+/** « KOFFI Jean-Marc » : le nom d'abord, en capitales, comme partout dans Nelima. */
 const nameParts = computed(() => {
     const parts = driverForm.fullName.trim().split(/\s+/).filter(Boolean);
     return { lastName: parts[0] ?? '', firstName: parts.slice(1).join(' ') };
@@ -482,6 +482,7 @@ onMounted(load);
                         <svg width="62" height="62" style="transform: rotate(-90deg)" aria-hidden="true">
                             <circle cx="31" cy="31" r="27" fill="none" stroke="#EAEEF4" stroke-width="8" />
                             <circle
+                                v-if="(overview?.fillRate ?? 0) > 0"
                                 cx="31" cy="31" r="27" fill="none" stroke="var(--pr)" stroke-width="8" stroke-linecap="round"
                                 :stroke-dasharray="`${(RING * Math.min(100, overview?.fillRate ?? 0)) / 100} ${RING}`"
                                 style="transition: stroke-dasharray 0.6s cubic-bezier(0.3, 0.8, 0.3, 1)"
@@ -556,7 +557,7 @@ onMounted(load);
             </div>
             <div v-if="!loading && !lines.length" class="empty">
                 <h4>Aucune ligne</h4>
-                <p>Créez la première ligne avec le bouton « Nouvelle ligne » : itinéraire, car, chauffeur et tarif.</p>
+                <p>Créez la première ligne avec le bouton « Nouvelle ligne » : itinéraire, car, chauffeur et tarif.</p>
             </div>
         </section>
 
