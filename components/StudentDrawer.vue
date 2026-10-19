@@ -300,6 +300,8 @@ onMounted(async () => {
             </div>
         </form>
 
+        <StudentDiets :student-id="student.id" />
+
         <p class="sec">Parents / Tuteurs</p>
         <div
             v-if="student.parentUsers?.length"

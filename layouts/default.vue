@@ -29,6 +29,8 @@ const allTabs = [
     { label: 'Calendrier', to: '/app/calendrier', icon: 'calendar', permission: 'calendar:read' },
     { label: 'Classes', to: '/app/classes', icon: 'layers', permission: 'class:read' },
     { label: 'Activités', to: '/app/activites', icon: 'ball', permission: 'activity:read' },
+    { label: 'Cantine', to: '/app/cantine', icon: 'utensils', permission: 'canteen:read' },
+    { label: 'Transport', to: '/app/transport', icon: 'bus', permission: 'transport:read' },
     { label: 'Élèves', to: '/app/eleves', icon: 'students', permission: 'student:read' },
     { label: 'Familles', to: '/app/parents', icon: 'user', permission: 'student:read' },
     { label: 'Personnel', to: '/app/personnel', icon: 'briefcase', permission: 'staff:read' },

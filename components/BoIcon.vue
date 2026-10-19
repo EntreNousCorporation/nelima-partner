@@ -26,6 +26,10 @@ const PATHS: Record<string, string[]> = {
     percent: ['M19 5L5 19', 'M7.5 10a2.5 2.5 0 100-5 2.5 2.5 0 000 5', 'M16.5 19a2.5 2.5 0 100-5 2.5 2.5 0 000 5'],
     'user-check': ['M9 11.6a3.6 3.6 0 100-7.2 3.6 3.6 0 000 7.2', 'M2.5 20c.9-4 3.5-6 6.5-6 1.2 0 2.3.3 3.3.9', 'M14.5 17.5l2 2 4-4.5'],
     clipboard: ['M7 4h10a2 2 0 012 2v13a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z', 'M9 4V3h6v1', 'M9 10h6M9 14h6M9 18h3'],
+    utensils: ['M6 3v7a2 2 0 002 2 2 2 0 002-2V3', 'M8 12v9', 'M16 3c-1.5 1.5-2 3.5-2 5.5S15 12 16 12v9'],
+    'map-pin': ['M12 22s7-7.5 7-13a7 7 0 10-14 0c0 5.5 7 13 7 13z', 'M12 11.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5'],
+    school: ['M3 10l9-5 9 5-9 5-9-5z', 'M7 12v5c0 1.5 2.5 3 5 3s5-1.5 5-3v-5', 'M21 10v5'],
+    'circle-check': ['M12 21a9 9 0 100-18 9 9 0 000 18', 'M8 12l3 3 5-6'],
     printer: ['M7 9V3h10v6', 'M5 9h14a2 2 0 012 2v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 012-2z', 'M7 16h10v5H7z'],
     mail: ['M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z', 'M3 7l9 6 9-6'],
     key: ['M8 19a4 4 0 100-8 4 4 0 000 8', 'M11 12l9-9M17 3l3 3M15 5l3 3'],
@@ -72,12 +76,30 @@ const PATHS: Record<string, string[]> = {
     trophy: ['M8 4h8v5a4 4 0 11-8 0V4z', 'M5 5H3v2a3 3 0 003 3M19 5h2v2a3 3 0 01-3 3', 'M9 14h6l-1 5h-4l-1-5z'],
 };
 
+/**
+ * Icônes du prototype qui portent des formes pleines (points de roue, puce de carte) : un tracé
+ * seul les rendrait creuses. Le SVG est repris tel quel, sans aucune donnée de l'utilisateur.
+ */
+const SHAPES: Record<string, string> = {
+    bus: '<rect x="4" y="4" width="16" height="12" rx="2.5"/><path d="M4 10h16"/><path d="M7 20v-2M17 20v-2"/>'
+        + '<circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/>',
+    card: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 9h18"/>'
+        + '<circle cx="16.5" cy="13.5" r="1.2" fill="currentColor" stroke="none"/>',
+    'percent-ring': '<path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>',
+};
+
 const paths = computed(() => PATHS[props.name] ?? []);
+const shape = computed(() => SHAPES[props.name]);
 </script>
 
 <template>
     <svg
-        v-if="paths.length" :width="size" :height="size" viewBox="0 0 24 24" fill="none"
+        v-if="shape" :width="size" :height="size" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" :stroke-width="strokeWidth" stroke-linecap="round"
+        stroke-linejoin="round" class="shrink-0 inline-block" aria-hidden="true" v-html="shape"
+    />
+    <svg
+        v-else-if="paths.length" :width="size" :height="size" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" :stroke-width="strokeWidth" stroke-linecap="round"
         stroke-linejoin="round" class="shrink-0 inline-block" aria-hidden="true"
     >

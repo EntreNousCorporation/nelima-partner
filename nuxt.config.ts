@@ -15,7 +15,7 @@ export default defineNuxtConfig({
         '@nuxtjs/i18n',
     ],
 
-    css: ['~/assets/css/main.css'],
+    css: ['~/assets/css/main.css', '~/assets/css/bo-mockup.css'],
 
     primevue: {
         options: {
