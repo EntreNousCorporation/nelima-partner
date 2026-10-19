@@ -583,7 +583,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                         <BoIcon v-else-if="dayFilled(d)" name="circle-check" :size="16" style="color: var(--gr)" />
                         <span v-else class="sv-dot" />
                     </button>
-                    <button type="button" class="btn gh sm" style="margin-top: 8px" @click="copyPreviousWeek"><BoIcon name="refresh" :size="15" />Reprendre la semaine précédente</button>
+                    <button type="button" class="btn gh sm" style="margin-top: 8px" @click="copyPreviousWeek"><BoIcon name="refresh" :size="15" />Copier la semaine passée</button>
                     <button type="button" class="btn gh sm" @click="openMenu(plusDays(menuWeek, 7))"><BoIcon name="chevron-right" :size="15" />Semaine suivante</button>
                 </nav>
                 <div v-if="editedDay">

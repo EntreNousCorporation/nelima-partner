@@ -828,7 +828,7 @@ onMounted(load);
             <template #footer>
                 <button type="button" class="btn gh" @click="lineOpen = false">Annuler</button>
                 <div style="flex: 1 1 0%" />
-                <button type="button" class="btn pr" :disabled="savingLine" @click="saveLine">{{ editingLine ? 'Enregistrer' : 'Créer la ligne' }}</button>
+                <button type="button" class="btn pr" :disabled="savingLine" @click="saveLine"><BoIcon name="check" :size="16" />{{ editingLine ? 'Enregistrer' : 'Créer la ligne' }}</button>
             </template>
         </BoModal>
 
@@ -885,7 +885,7 @@ onMounted(load);
             <template #footer>
                 <button type="button" class="btn gh" @click="driverOpen = false">Annuler</button>
                 <div style="flex: 1 1 0%" />
-                <button type="button" class="btn pr" @click="saveDriver">{{ editingDriver ? 'Enregistrer' : 'Ajouter le chauffeur' }}</button>
+                <button type="button" class="btn pr" @click="saveDriver"><BoIcon name="check" :size="16" />{{ editingDriver ? 'Enregistrer' : 'Ajouter le chauffeur' }}</button>
             </template>
         </BoModal>
 
