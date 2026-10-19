@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {
-    DIETS, MENU_ALLERGENS, WEEKDAYS, dietLabel, dietTone, formulaDays, formulaDaysLong, isoDay,
+    DIETS, MENU_ALLERGENS, WEEKDAYS, dietLabel, dietTone, formulaDays, formulaDaysLong, isoDay, termSchedule, type BillingPeriod,
     type CanteenFormula, type CanteenOverview, type CanteenSubscriber, type DietKind, type MenuDay,
 } from '~/composables/useCanteen';
 import { boAmount, fmtNumber as fmt, pillStyle } from '~/composables/useBoTones';
@@ -260,6 +260,10 @@ const startDate = ref(today);
 const pickedDiets = ref<DietKind[]>([]);
 const initialDiets = ref<DietKind[]>([]);
 const notifyFamily = ref(true);
+const billingPeriod = ref<BillingPeriod>('MONTHLY');
+const terms = computed(() => consultedYear.consulted.value?.periods ?? []);
+const termLines = computed(() => (chosenFormula.value && startDate.value
+    ? termSchedule(terms.value, startDate.value, Number(chosenFormula.value.monthlyPrice)) : []));
 const subscribing = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -290,6 +294,7 @@ function openSubscribe() {
     pickedDiets.value = [];
     initialDiets.value = [];
     notifyFamily.value = true;
+    billingPeriod.value = 'MONTHLY';
     subscribeOpen.value = true;
     findCandidates('');
 }
@@ -334,7 +339,7 @@ async function subscribe() {
         const dietsChanged = pickedDiets.value.length !== initialDiets.value.length
             || pickedDiets.value.some((d) => !initialDiets.value.includes(d));
         if (dietsChanged) await canteen.saveDiets(student.id, pickedDiets.value.map((kind) => ({ kind })));
-        await canteen.subscribe({ studentId: student.id, formulaId: pickedFormula.value, startDate: startDate.value, notifyFamily: notifyFamily.value });
+        await canteen.subscribe({ studentId: student.id, formulaId: pickedFormula.value, startDate: startDate.value, notifyFamily: notifyFamily.value, billingPeriod: billingPeriod.value });
         notice.value = `${student.lastName} ${student.firstName} est inscrit à la cantine ; ses mois sont facturés jusqu'à la fin de l'année.`;
         subscribeOpen.value = false;
         await load();
@@ -701,7 +706,10 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                     </div>
                     <div class="fld">
                         <label for="canteen-billing">Facturation</label>
-                        <select id="canteen-billing" disabled><option>Mensuel</option></select>
+                        <select id="canteen-billing" v-model="billingPeriod" :disabled="chosenFormula?.mealPrice != null">
+                            <option value="MONTHLY">Mensuel</option>
+                            <option value="TERM" :disabled="!terms.length">Trimestriel{{ terms.length ? '' : ' (trimestres non définis)' }}</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -737,6 +745,16 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                     <dd><span class="nu">{{ fmt(chosenFormula.mealPrice) }} FCFA / repas</span></dd>
                     <dt>Facturation</dt>
                     <dd>au repas servi, chaque mois, le 5 du mois suivant</dd>
+                </dl>
+            </div>
+            <div v-else-if="chosenFormula && billingPeriod === 'TERM'" style="background: rgb(250, 251, 253); border: 1px solid var(--bd); border-radius: 12px; padding: 14px">
+                <dl class="kv">
+                    <dt>Formule {{ chosenFormula.name }}</dt>
+                    <dd><span class="nu">{{ fmt(chosenFormula.monthlyPrice) }} FCFA / mois</span></dd>
+                    <template v-for="t in termLines" :key="t.label">
+                        <dt>{{ t.label }} · le {{ ddmm(t.due) }}</dt>
+                        <dd><span class="nu">{{ fmt(t.amount) }} FCFA</span></dd>
+                    </template>
                 </dl>
             </div>
             <div v-else-if="chosenFormula && billing" style="background: rgb(250, 251, 253); border: 1px solid var(--bd); border-radius: 12px; padding: 14px">

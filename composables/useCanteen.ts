@@ -47,7 +47,7 @@ export type CanteenOverview = {
     nextDueDate?: string | null; diets: { kind: DietKind; count: number }[];
 };
 export type CanteenSubscriber = {
-    subscriptionId: string; studentId: string; studentName: string; registrationNumber: string; photoId?: string | null;
+    subscriptionId: string; billingPeriod?: BillingPeriod; studentId: string; studentName: string; registrationNumber: string; photoId?: string | null;
     className?: string | null; formulaId: string; formulaName: string; startDate: string; endDate?: string | null;
     diets: Diet[]; paymentStatus: PaymentStatus; today?: 'SERVED' | 'ABSENT' | null; expectedToday: boolean;
 };
@@ -71,7 +71,7 @@ export function useCanteen() {
         createFormula: (body: FormulaBody) => api<CanteenFormula>('/canteen/formulas', { method: 'POST', body }),
         updateFormula: (id: string, body: FormulaBody) => api<CanteenFormula>(`/canteen/formulas/${id}`, { method: 'PUT', body }),
         subscribers: (day?: string) => api<CanteenSubscriber[]>('/canteen/subscriptions', { query: day ? { day } : {} }),
-        subscribe: (body: { studentId: string; formulaId: string; startDate?: string; notifyFamily?: boolean }) => api<CanteenSubscriber>('/canteen/subscriptions', { method: 'POST', body }),
+        subscribe: (body: { studentId: string; formulaId: string; startDate?: string; notifyFamily?: boolean; billingPeriod?: BillingPeriod }) => api<CanteenSubscriber>('/canteen/subscriptions', { method: 'POST', body }),
         end: (id: string, endDate?: string) => api(`/canteen/subscriptions/${id}/end`, { method: 'POST', body: { endDate } }),
         mark: (studentId: string, day: string, status: 'SERVED' | 'ABSENT' | null) => api('/canteen/attendance', { method: 'PUT', body: { studentId, day, status } }),
         kitchenSheet: (day?: string) => api<KitchenLine[]>('/canteen/kitchen-sheet', { query: day ? { day } : {} }),
@@ -117,4 +117,22 @@ export function formulaDaysLong(formula: { days: string[]; mealPrice?: number | 
         return `Hors ${WEEKDAYS.find((w) => w.value === missing[0])?.label.toLowerCase()}`;
     }
     return formulaDays(formula);
+}
+
+export type BillingPeriod = 'MONTHLY' | 'TERM';
+
+/**
+ * Échéancier au trimestre, calculé comme le serveur : une tranche par trimestre non terminé à
+ * l'arrivée, au tarif mensuel multiplié par les mois couverts, payable au début du trimestre (ou
+ * le jour d'arrivée).
+ */
+export function termSchedule(periods: { label: string; startDate: string; endDate: string }[], start: string, monthlyPrice: number) {
+    const ym = (iso: string) => { const [y, m] = iso.split('-').map(Number); return y! * 12 + (m! - 1); };
+    return [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .filter((p) => p.endDate >= start)
+        .map((p) => {
+            const from = p.startDate < start ? start : p.startDate;
+            const months = ym(p.endDate) - ym(from) + 1;
+            return { label: p.label, due: from, amount: months * monthlyPrice };
+        });
 }

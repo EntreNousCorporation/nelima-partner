@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth';
-import { WEEKDAYS, isoDay } from '~/composables/useCanteen';
+import { WEEKDAYS, isoDay, termSchedule } from '~/composables/useCanteen';
 import { boAmount, fmtNumber as fmt, pillStyle } from '~/composables/useBoTones';
 import { PAYMENT_STATUSES, studentPhotoUrl, type Student } from '~/composables/useStudents';
 import {
@@ -293,6 +293,10 @@ const candidates = ref<Student[]>([]);
 const picked = ref<Student | null>(null);
 const rideStop = ref('');
 const rideStart = ref(today);
+const rideBillingPeriod = ref<'MONTHLY' | 'TERM'>('MONTHLY');
+const terms = computed(() => consultedYear.consulted.value?.periods ?? []);
+const rideTerms = computed(() => (opened.value && rideStart.value
+    ? termSchedule(terms.value, rideStart.value, Number(opened.value.monthlyPrice)) : []));
 const subscribing = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -317,6 +321,7 @@ function openRide() {
     studentQuery.value = '';
     rideStop.value = opened.value?.stops[0]?.id ?? '';
     rideStart.value = opened.value?.startDate && opened.value.startDate > today ? opened.value.startDate : today;
+    rideBillingPeriod.value = 'MONTHLY';
     rideOpen.value = true;
     findCandidates('');
 }
@@ -337,7 +342,7 @@ async function subscribe() {
     if (!line || !picked.value) return;
     subscribing.value = true;
     try {
-        await transport.subscribe({ studentId: picked.value.id, lineId: line.id, stopId: rideStop.value || null, startDate: rideStart.value });
+        await transport.subscribe({ studentId: picked.value.id, lineId: line.id, stopId: rideStop.value || null, startDate: rideStart.value, billingPeriod: rideBillingPeriod.value });
         notice.value = `${picked.value.lastName} ${picked.value.firstName} prend la ${line.name} ; ses mois sont facturés jusqu'à la fin de l'année.`;
         rideOpen.value = false;
         riders.value = await transport.riders(line.id);
@@ -934,7 +939,10 @@ onMounted(load);
                     </div>
                     <div class="fld">
                         <label for="ride-billing">Facturation</label>
-                        <select id="ride-billing" disabled><option>Mensuel</option></select>
+                        <select id="ride-billing" v-model="rideBillingPeriod">
+                            <option value="MONTHLY">Mensuel</option>
+                            <option value="TERM" :disabled="!terms.length">Trimestriel{{ terms.length ? '' : ' (trimestres non définis)' }}</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -942,10 +950,18 @@ onMounted(load);
                 <dl class="kv">
                     <dt>{{ opened.name }}</dt>
                     <dd><span class="nu">{{ fmt(opened.monthlyPrice) }} FCFA / mois</span></dd>
-                    <dt>Reste de l’année ({{ rideBilling.months }} mois)</dt>
-                    <dd><span class="nu">{{ fmt(rideBilling.total) }} FCFA</span></dd>
-                    <dt>Facturation</dt>
-                    <dd>{{ rideBilling.months }} {{ plural(rideBilling.months, 'échéance') }}, la première le {{ ddmm(rideBilling.firstDue) }}</dd>
+                    <template v-if="rideBillingPeriod === 'TERM'">
+                        <template v-for="t in rideTerms" :key="t.label">
+                            <dt>{{ t.label }} · le {{ ddmm(t.due) }}</dt>
+                            <dd><span class="nu">{{ fmt(t.amount) }} FCFA</span></dd>
+                        </template>
+                    </template>
+                    <template v-else>
+                        <dt>Reste de l’année ({{ rideBilling.months }} mois)</dt>
+                        <dd><span class="nu">{{ fmt(rideBilling.total) }} FCFA</span></dd>
+                        <dt>Facturation</dt>
+                        <dd>{{ rideBilling.months }} {{ plural(rideBilling.months, 'échéance') }}, la première le {{ ddmm(rideBilling.firstDue) }}</dd>
+                    </template>
                     <dt>Places</dt>
                     <dd>{{ opened.capacity - opened.riders }} {{ plural(opened.capacity - opened.riders, 'libre') }} sur {{ opened.capacity }}</dd>
                 </dl>

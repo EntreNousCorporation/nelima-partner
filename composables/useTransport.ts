@@ -76,7 +76,7 @@ export function useTransport() {
         createDriver: (body: DriverBody) => api<TransportDriver>('/transport/drivers', { method: 'POST', body }),
         updateDriver: (id: string, body: DriverBody) => api<TransportDriver>(`/transport/drivers/${id}`, { method: 'PUT', body }),
         riders: (lineId?: string) => api<TransportRider[]>('/transport/subscriptions', { query: lineId ? { lineId } : {} }),
-        subscribe: (body: { studentId: string; lineId: string; stopId?: string | null; startDate?: string }) =>
+        subscribe: (body: { studentId: string; lineId: string; stopId?: string | null; startDate?: string; billingPeriod?: 'MONTHLY' | 'TERM' }) =>
             api<TransportRider>('/transport/subscriptions', { method: 'POST', body }),
         end: (id: string, endDate?: string) => api(`/transport/subscriptions/${id}/end`, { method: 'POST', body: { endDate } }),
     };
