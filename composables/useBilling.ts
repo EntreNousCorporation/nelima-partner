@@ -3,7 +3,7 @@ export type Installment = {
     label?: string;
     amount: number;
     dueDate?: string;
-    status: 'PENDING' | 'PAID' | 'CANCELLED';
+    status: 'PENDING' | 'PAID' | 'CANCELLED' | 'WRITTEN_OFF' | 'CARRIED_OVER';
     paidAt?: string;
     studentFee?: {
         student?: { id: string; firstName: string; lastName: string; registrationNumber: string; photoId?: string | null };

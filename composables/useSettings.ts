@@ -98,6 +98,8 @@ export type YearClosure = {
     pendingCount: number;
     pendingAmount: number;
     paymentsInProgress: number;
+    /** Année sur laquelle reporter les impayés ; absente tant que la plateforme ne l'a pas définie. */
+    nextYearLabel?: string | null;
     outstanding: { studentId: string; studentName: string; registrationNumber: string; installmentCount: number; amount: number }[];
 };
 
@@ -204,6 +206,12 @@ export function useSettings() {
         return api<YearClosure>(`/academic-years/${id}/close`, { method: 'POST' });
     }
 
+    /** Reporte les impayés de l'année sur la suivante : l'année peut ensuite se clôturer. */
+    function carryOver(id: string) {
+        return api<{ installments: number; students: number; amount: number; targetLabel: string }>(
+            `/academic-years/${id}/carry-over`, { method: 'POST' });
+    }
+
     /** L'année que l'utilisateur consulte ; sans identifiant, retour à l'année en cours. */
     function consult(id?: string) {
         return api('/academic-years/consulted', { method: 'PUT', query: id ? { academicYearId: id } : {} });
@@ -231,7 +239,7 @@ export function useSettings() {
 
     return {
         establishment, updateEstablishment,
-        years, definePeriods, consult, closure, closeYear,
+        years, definePeriods, consult, closure, closeYear, carryOver,
         notifications, setNotification,
         audit,
     };

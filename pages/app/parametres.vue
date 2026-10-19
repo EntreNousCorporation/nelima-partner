@@ -336,6 +336,26 @@ async function loadClosure() {
     }
 }
 
+/* Report des impayés sur l'année suivante, pour pouvoir clôturer sans renoncer à la dette. */
+const confirmingCarry = ref(false);
+const carrying = ref(false);
+
+async function carryOver() {
+    const year = consultedYear.consulted.value;
+    if (!year) return;
+    carrying.value = true;
+    try {
+        const result = await settings.carryOver(year.id);
+        confirmingCarry.value = false;
+        await loadClosure();
+        done(`${result.installments} tranche(s) de ${result.students} élève(s), ${Number(result.amount).toLocaleString('fr-FR')} F, reportées sur ${result.targetLabel}. L'année ${year.label} peut maintenant être clôturée.`);
+    } catch (e) {
+        fail(e, "Le report n'a pas pu être fait.");
+    } finally {
+        carrying.value = false;
+    }
+}
+
 async function closeYear() {
     const year = consultedYear.consulted.value;
     if (!year) return;
@@ -801,6 +821,29 @@ onMounted(async () => {
                                         </tr>
                                     </tbody>
                                 </table>
+                            </div>
+
+                            <div
+                                v-if="canWrite && closure.pendingCount > 0 && closure.nextYearLabel"
+                                class="rounded-lg p-3 mb-3" style="border: 1px solid var(--border); background: var(--surface-sunken)"
+                            >
+                                <p class="text-[13px] mb-2">
+                                    Les familles qui doivent encore peuvent régler sur l'année suivante : chaque tranche due
+                                    passe sur <b>{{ closure.nextYearLabel }}</b> sous un frais « Report {{ closure.label }} »,
+                                    au même montant, payable dès la rentrée. Rien n'est effacé.
+                                </p>
+                                <button v-if="!confirmingCarry" class="btn-secondary" @click="confirmingCarry = true">
+                                    <BoIcon name="arrow-right" :size="16" />Reporter les impayés sur {{ closure.nextYearLabel }}
+                                </button>
+                                <div v-else class="flex flex-wrap items-center gap-2">
+                                    <span class="text-[13px] font-semibold">
+                                        {{ closure.pendingCount }} tranche(s), {{ Number(closure.pendingAmount).toLocaleString('fr-FR') }} F, passeront sur {{ closure.nextYearLabel }}.
+                                    </span>
+                                    <button class="btn-primary" :disabled="carrying" @click="carryOver">
+                                        {{ carrying ? 'Report…' : 'Confirmer le report' }}
+                                    </button>
+                                    <button class="btn-secondary" @click="confirmingCarry = false">Annuler</button>
+                                </div>
                             </div>
 
                             <template v-if="canWrite">

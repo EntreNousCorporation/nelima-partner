@@ -181,6 +181,17 @@ onMounted(async () => {
         loading.value = false;
     }
 });
+
+/** Étiquette d'une tranche : une tranche close autrement que réglée le dit, au lieu d'« À venir ». */
+function installmentPill(installment: { status: string; dueDate?: string | null }): { tone: 'ok' | 'warn' | 'late' | 'mute'; label: string } {
+    switch (installment.status) {
+        case 'PAID': return { tone: 'ok', label: 'Réglée' };
+        case 'CANCELLED': return { tone: 'mute', label: 'Annulée' };
+        case 'WRITTEN_OFF': return { tone: 'mute', label: 'Passée en perte' };
+        case 'CARRIED_OVER': return { tone: 'mute', label: 'Reportée' };
+        default: return isLate(installment as any) ? { tone: 'late', label: 'En retard' } : { tone: 'warn', label: 'À venir' };
+    }
+}
 </script>
 
 <template>
@@ -360,8 +371,8 @@ onMounted(async () => {
                     <b class="nu text-[12.5px]" style="color: var(--navy)">
                         {{ formatAmount(installment.amount) }}
                     </b>
-                    <UiPill :tone="installment.status === 'PAID' ? 'ok' : isLate(installment) ? 'late' : 'warn'">
-                        {{ installment.status === 'PAID' ? 'Réglée' : isLate(installment) ? 'En retard' : 'À venir' }}
+                    <UiPill :tone="installmentPill(installment).tone">
+                        {{ installmentPill(installment).label }}
                     </UiPill>
                 </div>
             </div>
