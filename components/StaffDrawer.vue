@@ -14,6 +14,8 @@ const props = defineProps<{ member: StaffMember; classes: SchoolClass[] }>();
 const emit = defineEmits<{ close: []; changed: [] }>();
 
 const { assignClasses, unassignClass } = useStaff();
+/** Les rattachements sont annuels : on dit de quelle année il s'agit. */
+const consultedYear = useConsultedYear();
 const { can } = usePermissions();
 
 const working = ref(false);
@@ -125,7 +127,7 @@ async function detach(classId: string) {
 
         <p v-if="error" class="alert-danger mb-4" role="alert">{{ error }}</p>
 
-        <p class="sec">Classes où il intervient</p>
+        <p class="sec">Classes où il intervient<template v-if="consultedYear.consulted.value"> en {{ consultedYear.consulted.value.label }}</template></p>
         <p v-if="!isTeacher" class="text-[12.5px] mb-3" style="color: var(--text-faint)">
             Le rattachement à une classe est réservé au personnel enseignant.
         </p>
