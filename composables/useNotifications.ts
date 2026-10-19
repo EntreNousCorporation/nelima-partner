@@ -5,7 +5,8 @@
  * « lu » tient en une date posée sur le compte, et ouvrir le panneau la déplace.
  */
 
-export type NotificationKind = 'ACTIVITY_REQUEST' | 'PAYMENT_TO_RECONCILE' | 'INSTALLMENT_OVERDUE';
+export type NotificationKind = 'ACTIVITY_REQUEST' | 'PAYMENT_TO_RECONCILE' | 'INSTALLMENT_OVERDUE'
+    | 'WRITE_OFF_TO_APPROVE' | 'WRITE_OFF_DECIDED';
 
 export type AppNotification = {
     id: string;
@@ -22,6 +23,8 @@ export const NOTIFICATION_KINDS: Record<NotificationKind, { icon: string; tone: 
     ACTIVITY_REQUEST: { icon: 'ball', tone: 'var(--purple)' },
     PAYMENT_TO_RECONCILE: { icon: 'alert', tone: 'var(--danger)' },
     INSTALLMENT_OVERDUE: { icon: 'clock', tone: 'var(--warning)' },
+    WRITE_OFF_TO_APPROVE: { icon: 'shield-check', tone: 'var(--danger)' },
+    WRITE_OFF_DECIDED: { icon: 'check-circle', tone: 'var(--brand-600)' },
 };
 
 export function notificationIcon(kind: NotificationKind) {

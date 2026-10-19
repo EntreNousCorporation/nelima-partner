@@ -124,7 +124,10 @@ export type AuditAction =
     | 'ACCOUNTING_EXPORTED'
     | 'REMINDER_CAMPAIGN_SENT'
     | 'PORTAL_ACCESS_GRANTED'
-    | 'PORTAL_ACCESS_REVOKED';
+    | 'PORTAL_ACCESS_REVOKED'
+    | 'DEBT_WRITE_OFF_PROPOSED'
+    | 'DEBT_WRITE_OFF_APPROVED'
+    | 'DEBT_WRITE_OFF_REJECTED';
 
 export type AuditEvent = {
     id: string;
@@ -156,6 +159,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     REMINDER_CAMPAIGN_SENT: 'Campagne de relance',
     PORTAL_ACCESS_GRANTED: 'Accès au portail ouvert',
     PORTAL_ACCESS_REVOKED: 'Accès au portail fermé',
+    DEBT_WRITE_OFF_PROPOSED: 'Passage en perte proposé',
+    DEBT_WRITE_OFF_APPROVED: 'Passage en perte validé',
+    DEBT_WRITE_OFF_REJECTED: 'Passage en perte refusé',
 };
 
 /** Les trois canaux affichés dans l'ordre de la maquette, sur toute la matrice. */

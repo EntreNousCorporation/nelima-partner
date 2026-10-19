@@ -15,6 +15,7 @@ const items = [
     { label: 'Reçus', to: '/app/paiements/recus' },
     { label: 'Frais & échéanciers', to: '/app/paiements/frais', permission: 'fee:read' },
     { label: 'Relances', to: '/app/paiements/relances' },
+    { label: 'Pertes', to: '/app/paiements/pertes', permission: 'writeoff:propose' },
     { label: 'Guichet', to: '/app/paiements/guichet', permission: 'collection:write' },
 ];
 </script>

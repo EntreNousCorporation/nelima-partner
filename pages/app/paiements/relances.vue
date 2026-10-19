@@ -9,6 +9,35 @@ const { installments } = useBilling();
 const { targets, campaigns, send } = useReminders();
 const { can } = usePermissions();
 
+/* ---- Passage en perte : la comptabilité propose, la direction tranche (onglet Pertes) ---- */
+const writeOffs = useWriteOffs();
+const canWriteOff = computed(() => can('writeoff:propose'));
+const writeOffTarget = ref<Installment | null>(null);
+const writeOffReason = ref('');
+const proposing = ref(false);
+const proposed = ref(new Set<string>());
+
+function openWriteOff(row: Installment) {
+    writeOffTarget.value = row;
+    writeOffReason.value = '';
+}
+
+async function proposeWriteOff() {
+    const row = writeOffTarget.value;
+    if (!row || !writeOffReason.value.trim()) return;
+    proposing.value = true;
+    try {
+        await writeOffs.propose(row.id, writeOffReason.value.trim());
+        proposed.value = new Set([...proposed.value, row.id]);
+        writeOffTarget.value = null;
+        error.value = '';
+    } catch (e: any) {
+        error.value = e?.data?.debugMessage ?? "La demande n'a pas pu être envoyée.";
+    } finally {
+        proposing.value = false;
+    }
+}
+
 const rows = ref<Installment[]>([]);
 const loading = ref(true);
 const error = ref('');
@@ -125,6 +154,12 @@ onMounted(async () => {
             .catch(() => { error.value = "Les impayés n'ont pas pu être chargés."; })
             .finally(() => { loading.value = false; }),
         loadReminders(),
+        // Tranches dont la perte attend déjà la direction : affichées comme telles.
+        canWriteOff.value
+            ? writeOffs.list()
+                .then((list) => { proposed.value = new Set(list.filter((w) => w.status === 'PROPOSED').map((w) => w.installmentId)); })
+                .catch(() => undefined)
+            : Promise.resolve(),
     ]);
 });
 </script>
@@ -334,10 +369,11 @@ onMounted(async () => {
                             <th>Échéance</th>
                             <th>Retard</th>
                             <th class="text-right">Montant dû</th>
+                            <th v-if="canWriteOff" />
                         </tr>
                     </thead>
                     <tbody>
-                        <TableSkeleton v-if="loading" :columns="5" />
+                        <TableSkeleton v-if="loading" :columns="canWriteOff ? 6 : 5" />
                         <tr v-for="row in filtered" v-else :key="row.id">
                             <td>
                                 <div class="flex items-center gap-2.5">
@@ -360,6 +396,10 @@ onMounted(async () => {
                                 </UiPill>
                             </td>
                             <td class="num" style="color: var(--navy)">{{ formatAmount(row.amount) }}</td>
+                            <td v-if="canWriteOff" class="text-right">
+                                <UiPill v-if="proposed.has(row.id)" tone="warn">Perte proposée</UiPill>
+                                <button v-else type="button" class="btn-ghost btn-sm" @click="openWriteOff(row)">Passer en perte</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -390,5 +430,29 @@ onMounted(async () => {
                 </span>
             </template>
         </UiCard>
+
+        <SideDrawer
+            v-if="writeOffTarget" title="Passer en perte"
+            :sub="`${studentOf(writeOffTarget).name} · ${installmentLabel(writeOffTarget)} · ${formatAmount(writeOffTarget.amount)}`"
+            @close="writeOffTarget = null"
+        >
+            <p class="text-[13px]" style="color: var(--text-muted)">
+                La tranche reste due et relancée tant que la direction n'a pas validé. Une fois validée,
+                elle n'est plus réclamée et figure comme perte ; la décision est inscrite au journal d'audit.
+            </p>
+            <label class="field-label mt-4" for="writeoff-reason">Motif</label>
+            <textarea
+                id="writeoff-reason" v-model="writeOffReason" rows="4" maxlength="500" class="input"
+                style="height: auto; padding-top: 8px"
+                placeholder="Ex. famille partie sans adresse, relances sans réponse depuis six mois"
+            />
+            <p class="hint">La direction tranche sur la base de ce motif.</p>
+            <template #footer>
+                <button type="button" class="btn-secondary" @click="writeOffTarget = null">Annuler</button>
+                <button type="button" class="btn-primary" :disabled="proposing || !writeOffReason.trim()" @click="proposeWriteOff">
+                    <BoIcon name="send" :size="16" />Envoyer à la direction
+                </button>
+            </template>
+        </SideDrawer>
     </div>
 </template>
