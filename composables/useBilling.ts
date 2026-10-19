@@ -6,7 +6,7 @@ export type Installment = {
     status: 'PENDING' | 'PAID' | 'CANCELLED';
     paidAt?: string;
     studentFee?: {
-        student?: { id: string; firstName: string; lastName: string; registrationNumber: string };
+        student?: { id: string; firstName: string; lastName: string; registrationNumber: string; photoId?: string | null };
         fee?: { name: string };
     };
 };
@@ -20,6 +20,8 @@ export type Receipt = {
     issuedAt: string;
     studentLabel?: string;
     studentRegistrationNumber?: string;
+    studentId?: string | null;
+    studentPhotoId?: string | null;
     payerLabel?: string;
     channel?: PaymentChannel;
 };
@@ -76,8 +78,12 @@ export function installmentLabel(installment: Installment) {
 
 export function studentOf(installment: Installment) {
     const s = installment.studentFee?.student;
-    if (!s) return { name: '—', matricule: '—' };
-    return { name: `${s.lastName} ${s.firstName}`.trim(), matricule: s.registrationNumber };
+    if (!s) return { name: '—', matricule: '—', photo: null as string | null };
+    return {
+        name: `${s.lastName} ${s.firstName}`.trim(),
+        matricule: s.registrationNumber,
+        photo: s.photoId ? `/api/v1/students/${s.id}/photo?v=${s.photoId}` : null,
+    };
 }
 
 export function useBilling() {

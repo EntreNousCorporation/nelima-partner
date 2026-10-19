@@ -13,7 +13,7 @@ const error = ref('');
 
 /* ---- Formulaire du guichet ---- */
 const query = ref('');
-const selectedStudent = ref<{ name: string; matricule: string } | null>(null);
+const selectedStudent = ref<{ name: string; matricule: string; photo?: string | null } | null>(null);
 const selectedInstallment = ref<Installment | null>(null);
 const channel = ref('CASH');
 const reference = ref('');
@@ -32,7 +32,7 @@ const issued = ref<Receipt | null>(null);
 const matches = computed(() => {
     const q = query.value.trim().toLowerCase();
     if (q.length < 2) return [];
-    const byMatricule = new Map<string, { name: string; matricule: string; due: number; count: number }>();
+    const byMatricule = new Map<string, { name: string; matricule: string; photo: string | null; due: number; count: number }>();
     for (const installment of pending.value) {
         const student = studentOf(installment);
         if (!student.name.toLowerCase().includes(q) && !student.matricule.toLowerCase().includes(q)) {
@@ -55,8 +55,8 @@ const dueOfStudent = computed(() => {
         .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
 });
 
-function pickStudent(student: { name: string; matricule: string }) {
-    selectedStudent.value = { name: student.name, matricule: student.matricule };
+function pickStudent(student: { name: string; matricule: string; photo?: string | null }) {
+    selectedStudent.value = { name: student.name, matricule: student.matricule, photo: student.photo ?? null };
     query.value = student.name;
     // Une seule tranche due : la choisir d'office évite un clic qui n'apporte rien.
     selectedInstallment.value = dueOfStudent.value.length === 1 ? dueOfStudent.value[0] : null;
@@ -288,7 +288,7 @@ onMounted(async () => {
                                 style="border-bottom: 1px solid var(--border)"
                                 @click="pickStudent(student)"
                             >
-                                <AvatarBadge :name="student.name" :size="26" />
+                                <AvatarBadge :name="student.name" :size="26" :src="student.photo" />
                                 <div class="nm flex-1 min-w-0">
                                     <b>{{ student.name }}</b>
                                     <span class="nu">
@@ -307,6 +307,19 @@ onMounted(async () => {
                             Aucun élève avec une tranche due ne correspond. Un élève à jour
                             n'apparaît pas ici.
                         </p>
+                    </div>
+
+                    <!-- La photo, pour s'assurer au comptoir qu'on encaisse pour le bon enfant :
+                         deux homonymes dans une école de mille élèves, ce n'est pas rare. -->
+                    <div
+                        v-if="selectedStudent" class="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                        style="border: 1px solid var(--border); background: var(--surface-sunken)"
+                    >
+                        <AvatarBadge :name="selectedStudent.name" :size="44" :src="selectedStudent.photo" />
+                        <div class="nm min-w-0">
+                            <b>{{ selectedStudent.name }}</b>
+                            <span class="nu">{{ selectedStudent.matricule }}</span>
+                        </div>
                     </div>
 
                     <div v-if="selectedStudent">

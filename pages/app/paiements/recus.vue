@@ -147,7 +147,7 @@ onMounted(() => {
                             </td>
                             <td>
                                 <div class="flex items-center gap-2.5">
-                                    <AvatarBadge :name="row.studentLabel" :size="28" tone="mute" />
+                                    <AvatarBadge :name="row.studentLabel" :size="28" tone="mute" :src="row.studentId && row.studentPhotoId ? `/api/v1/students/${row.studentId}/photo?v=${row.studentPhotoId}` : null" />
                                     <div class="nm min-w-0">
                                         <b>{{ row.studentLabel ?? '—' }}</b>
                                         <span class="nu">{{ row.studentRegistrationNumber ?? '—' }}</span>

@@ -341,7 +341,7 @@ onMounted(async () => {
                         <tr v-for="row in filtered" v-else :key="row.id">
                             <td>
                                 <div class="flex items-center gap-2.5">
-                                    <AvatarBadge :name="studentOf(row).name" :size="28" tone="mute" />
+                                    <AvatarBadge :name="studentOf(row).name" :size="28" tone="mute" :src="studentOf(row).photo" />
                                     <div class="nm min-w-0">
                                         <b>{{ studentOf(row).name }}</b>
                                         <span class="nu">{{ studentOf(row).matricule }}</span>

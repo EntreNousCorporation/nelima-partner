@@ -171,7 +171,7 @@ onMounted(load);
                             </td>
                             <td>
                                 <div class="flex items-center gap-2.5">
-                                    <AvatarBadge :name="row.studentLabel" :size="28" />
+                                    <AvatarBadge :name="row.studentLabel" :size="28" :src="row.studentId && row.studentPhotoId ? `/api/v1/students/${row.studentId}/photo?v=${row.studentPhotoId}` : null" />
                                     <div class="min-w-0">
                                 <b class="block text-[12.5px]" style="color: var(--navy)">
                                     {{ row.studentLabel }}

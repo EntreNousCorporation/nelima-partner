@@ -13,6 +13,8 @@ export type Transaction = {
     providerType?: string;
     studentLabel: string;
     studentRegistrationNumber?: string;
+    studentId?: string | null;
+    studentPhotoId?: string | null;
     installmentLabel?: string;
     payerName?: string;
     amountSchool: number;
