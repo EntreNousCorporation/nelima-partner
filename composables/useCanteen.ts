@@ -36,8 +36,10 @@ export const WEEKDAYS = [
 ];
 
 export type CanteenFormula = {
-    id: string; name: string; days: string[]; monthlyPrice: number; active: boolean; subscribers: number;
+    id: string; name: string; days: string[]; monthlyPrice: number; mealPrice?: number | null; active: boolean; subscribers: number;
 };
+/** Une formule est au mois (forfait) ou au repas (ticket), jamais les deux. */
+export type FormulaBody = { name: string; days: string[]; monthlyPrice?: number | null; mealPrice?: number | null; active: boolean };
 export type Diet = { kind: DietKind; label?: string | null };
 export type CanteenOverview = {
     day: string; subscribers: number; shareOfEnrollment: number; expectedToday: number; servedToday: number;
@@ -66,8 +68,8 @@ export function useCanteen() {
     return {
         overview: (day?: string) => api<CanteenOverview>('/canteen/overview', { query: day ? { day } : {} }),
         formulas: () => api<CanteenFormula[]>('/canteen/formulas'),
-        createFormula: (body: Omit<CanteenFormula, 'id' | 'subscribers'>) => api<CanteenFormula>('/canteen/formulas', { method: 'POST', body }),
-        updateFormula: (id: string, body: Omit<CanteenFormula, 'id' | 'subscribers'>) => api<CanteenFormula>(`/canteen/formulas/${id}`, { method: 'PUT', body }),
+        createFormula: (body: FormulaBody) => api<CanteenFormula>('/canteen/formulas', { method: 'POST', body }),
+        updateFormula: (id: string, body: FormulaBody) => api<CanteenFormula>(`/canteen/formulas/${id}`, { method: 'PUT', body }),
         subscribers: (day?: string) => api<CanteenSubscriber[]>('/canteen/subscriptions', { query: day ? { day } : {} }),
         subscribe: (body: { studentId: string; formulaId: string; startDate?: string; notifyFamily?: boolean }) => api<CanteenSubscriber>('/canteen/subscriptions', { method: 'POST', body }),
         end: (id: string, endDate?: string) => api(`/canteen/subscriptions/${id}/end`, { method: 'POST', body: { endDate } }),
@@ -105,7 +107,8 @@ export function dietTone(kind: DietKind): BoTone {
 }
 
 /** Jours d'une formule en toutes lettres, comme sur les cartes de la maquette. */
-export function formulaDaysLong(formula: { days: string[] }) {
+export function formulaDaysLong(formula: { days: string[]; mealPrice?: number | null }) {
+    if (formula.mealPrice != null) return 'Tickets à l’unité';
     const school = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
     if (!formula.days.length) return 'Repas à l’unité';
     if (school.every((d) => formula.days.includes(d)) && formula.days.length === 5) return 'Lundi au vendredi';

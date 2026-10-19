@@ -219,13 +219,14 @@ async function printKitchen() {
 /* ---------------- Formules ---------------- */
 const formulasOpen = ref(false);
 const editingFormula = ref<CanteenFormula | null>(null);
-const formulaForm = reactive({ name: '', days: [] as string[], monthlyPrice: '' as string | number, active: true });
+const formulaForm = reactive({ name: '', perMeal: false, days: [] as string[], price: '' as string | number, active: true });
 
 function editFormula(formula?: CanteenFormula) {
     editingFormula.value = formula ?? null;
     Object.assign(formulaForm, formula
-        ? { name: formula.name, days: [...formula.days], monthlyPrice: formula.monthlyPrice, active: formula.active }
-        : { name: '', days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'], monthlyPrice: '', active: true });
+        ? { name: formula.name, perMeal: formula.mealPrice != null, days: [...formula.days],
+            price: formula.mealPrice ?? formula.monthlyPrice, active: formula.active }
+        : { name: '', perMeal: false, days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'], price: '', active: true });
 }
 
 function toggleFormulaDay(day: string) {
@@ -233,7 +234,10 @@ function toggleFormulaDay(day: string) {
 }
 
 async function saveFormula() {
-    const body = { name: formulaForm.name, days: formulaForm.days, monthlyPrice: Number(formulaForm.monthlyPrice), active: formulaForm.active };
+    const price = Number(formulaForm.price);
+    const body = formulaForm.perMeal
+        ? { name: formulaForm.name, days: [], monthlyPrice: null, mealPrice: price, active: formulaForm.active }
+        : { name: formulaForm.name, days: formulaForm.days, monthlyPrice: price, mealPrice: null, active: formulaForm.active };
     try {
         if (editingFormula.value) await canteen.updateFormula(editingFormula.value.id, body);
         else await canteen.createFormula(body);
@@ -686,7 +690,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                     >
                         <b>{{ f.name }}</b>
                         <span>{{ formulaDaysLong(f) }}</span>
-                        <em class="nu">{{ fmt(f.monthlyPrice) }} F <small>/ mois</small></em>
+                        <em class="nu">{{ fmt(f.mealPrice ?? f.monthlyPrice) }} F <small>/ {{ f.mealPrice != null ? 'repas' : 'mois' }}</small></em>
                     </button>
                 </div>
                 <p v-else style="margin: 0; font: 500 12.5px / 1.45 Inter; color: var(--tx3)">Aucune formule : créez-en une avec « Gérer les formules ».</p>
@@ -727,7 +731,15 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                 </section>
             </div>
 
-            <div v-if="chosenFormula && billing" style="background: rgb(250, 251, 253); border: 1px solid var(--bd); border-radius: 12px; padding: 14px">
+            <div v-if="chosenFormula && chosenFormula.mealPrice != null" style="background: rgb(250, 251, 253); border: 1px solid var(--bd); border-radius: 12px; padding: 14px">
+                <dl class="kv">
+                    <dt>Formule {{ chosenFormula.name }}</dt>
+                    <dd><span class="nu">{{ fmt(chosenFormula.mealPrice) }} FCFA / repas</span></dd>
+                    <dt>Facturation</dt>
+                    <dd>au repas servi, chaque mois, le 5 du mois suivant</dd>
+                </dl>
+            </div>
+            <div v-else-if="chosenFormula && billing" style="background: rgb(250, 251, 253); border: 1px solid var(--bd); border-radius: 12px; padding: 14px">
                 <dl class="kv">
                     <dt>Formule {{ chosenFormula.name }}</dt>
                     <dd><span class="nu">{{ fmt(chosenFormula.monthlyPrice) }} FCFA / mois</span></dd>
@@ -753,7 +765,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                     <div class="nm">
                         <div>
                             <b>{{ f.name }}<template v-if="!f.active"> · retirée</template></b>
-                            <span>{{ formulaDays(f) }} · {{ fmt(f.monthlyPrice) }} F / mois · {{ f.subscribers }} {{ plural(f.subscribers, 'abonné') }}</span>
+                            <span>{{ f.mealPrice != null ? `Au repas · ${fmt(f.mealPrice)} F / repas` : `${formulaDays(f)} · ${fmt(f.monthlyPrice)} F / mois` }} · {{ f.subscribers }} {{ plural(f.subscribers, 'abonné') }}</span>
                         </div>
                     </div>
                     <button type="button" class="btn out sm" @click="editFormula(f)"><BoIcon name="edit" :size="15" />Modifier</button>
@@ -764,9 +776,19 @@ onMounted(() => Promise.all([load(), loadMenu()]));
             </div>
             <div class="frm">
                 <div class="fld"><label for="formula-name">Nom *</label><input id="formula-name" v-model="formulaForm.name" placeholder="Ex. 5 jours" maxlength="64" /></div>
-                <div class="fld"><label for="formula-price">Tarif mensuel (FCFA) *</label><input id="formula-price" v-model="formulaForm.monthlyPrice" inputmode="numeric" placeholder="45000" /></div>
+                <div class="fld">
+                    <label for="formula-price">{{ formulaForm.perMeal ? 'Prix d’un repas (FCFA) *' : 'Tarif mensuel (FCFA) *' }}</label>
+                    <input id="formula-price" v-model="formulaForm.price" inputmode="numeric" :placeholder="formulaForm.perMeal ? '1500' : '45000'" />
+                </div>
             </div>
             <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px">
+                <button type="button" class="chip" :aria-pressed="!formulaForm.perMeal" :disabled="!!editingFormula" @click="formulaForm.perMeal = false">Au mois</button>
+                <button type="button" class="chip" :aria-pressed="formulaForm.perMeal" :disabled="!!editingFormula" @click="formulaForm.perMeal = true; formulaForm.days = []">Au repas (ticket)</button>
+            </div>
+            <p v-if="formulaForm.perMeal" style="margin: 10px 0 0; font: 500 12px / 1.5 Inter; color: var(--tx3)">
+                Facturée au repas servi : chaque repas pointé « Servi » compte, une tranche par mois payable le 5 du mois suivant.
+            </p>
+            <div v-else style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px">
                 <button
                     v-for="d in WEEKDAYS" :key="d.value" type="button" class="chip"
                     :aria-pressed="formulaForm.days.includes(d.value)" @click="toggleFormulaDay(d.value)"
@@ -789,7 +811,7 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                 <button type="button" class="btn gh" @click="formulasOpen = false">Fermer</button>
                 <div style="flex: 1 1 0%" />
                 <button v-if="editingFormula" type="button" class="btn out" @click="editFormula()">Nouvelle formule</button>
-                <button type="button" class="btn pr" :disabled="!formulaForm.name.trim() || formulaForm.monthlyPrice === ''" @click="saveFormula">
+                <button type="button" class="btn pr" :disabled="!formulaForm.name.trim() || formulaForm.price === ''" @click="saveFormula">
                     <BoIcon name="check" :size="16" />Enregistrer
                 </button>
             </template>
