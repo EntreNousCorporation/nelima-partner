@@ -17,8 +17,14 @@
     --pu: #8A5BFF; --pu-d: var(--purple); --pu-t: var(--purple-soft); --row: 52px;
     /* Fond des pastilles neutres de la maquette (« Absent »). */
     --mute-t: #EDF1F7;
-    color: var(--tx); font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    color: var(--tx); font-family: Inter, -apple-system, system-ui, sans-serif;
+    /* Corps de texte de la maquette : 13,5 px, interligne 1,45. */
+    font-size: 13.5px; line-height: 1.45;
 }
+/* Les titres du portail ont leur propre interligne ; ceux de la maquette héritent du corps. */
+.bo-page h1, .bo-page h2, .bo-page h3, .bo-page h4 { line-height: 1.45; }
+/* Le portail remet à zéro la marge intérieure des champs ; la maquette garde celle du navigateur. */
+.bo-page .inp input { padding: 1px 2px; }
 
 .bo-page h1, .bo-page h2, .bo-page h3, .bo-page h4, .bo-page .nu { font-family: Nunito, system-ui, sans-serif; }
 .bo-page button { font: inherit; cursor: pointer; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; background: none; padding: 0px; color: inherit; text-align: left; }
