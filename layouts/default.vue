@@ -119,10 +119,7 @@ async function logout() {
                 >Écoles</em>
             </NuxtLink>
 
-            <span
-                class="hidden md:flex items-center h-[34px] px-2.5 rounded-lg text-[13px] font-semibold truncate max-w-xs"
-                style="background: rgba(255,255,255,.09)"
-            >{{ auth.user?.establishmentName ?? 'Établissement' }}</span>
+            <SiteSwitcher />
 
             <GlobalSearch />
 

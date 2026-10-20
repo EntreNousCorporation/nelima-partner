@@ -1,4 +1,4 @@
-import { createError, defineEventHandler } from 'h3';
+import { createError, defineEventHandler, getQuery } from 'h3';
 import { getSchoolSession } from '~~/server/utils/auth';
 
 /** Délai au-delà duquel le profil est relu auprès du backend. */
@@ -18,7 +18,9 @@ export default defineEventHandler(async (event) => {
     if (!user) {
         throw createError({ statusCode: 401 });
     }
-    if (accessToken && Date.now() - (profileCheckedAt ?? 0) > PROFILE_TTL_MS) {
+    // `?refresh=1` après un changement de site : le profil (nom du site affiché) doit suivre tout de suite.
+    const forced = getQuery(event).refresh === '1';
+    if (accessToken && (forced || Date.now() - (profileCheckedAt ?? 0) > PROFILE_TTL_MS)) {
         const config = useRuntimeConfig();
         const profile = await $fetch.raw<Record<string, any>>(`${config.backendUrl}/users/me`, {
             headers: { Authorization: `Bearer ${accessToken}` },
@@ -38,6 +40,9 @@ export default defineEventHandler(async (event) => {
                 establishmentName: raw.establishmentName ?? user.establishmentName,
                 roleCode: raw.roleCode ?? user.roleCode,
                 permissions: raw.permissions ?? user.permissions,
+                groupWide: !!raw.groupWide,
+                schoolGroupName: raw.schoolGroupName ?? null,
+                establishmentId: raw.establishmentId ?? user.establishmentId,
             };
             await session.update({ user: refreshed, profileCheckedAt: Date.now() });
             return { user: refreshed };

@@ -20,6 +20,10 @@ export type SchoolUser = {
      * réponses, pas seulement masqués à l'écran.
      */
     permissions?: string[];
+    /** Direction de groupe : peut afficher les autres sites de son groupe. */
+    groupWide?: boolean;
+    /** Groupe scolaire du site affiché, s'il en fait partie. */
+    schoolGroupName?: string | null;
 };
 
 export type SessionData = {
