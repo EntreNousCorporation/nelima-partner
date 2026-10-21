@@ -3,6 +3,7 @@ import {
     NOTIFICATION_CHANNELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_EVENT_LABELS,
     auditActionLabel, primaryContact,
     type AcademicYear, type AuditEvent, type YearClosure, type Establishment, type NotificationChannel,
+    type RoleSettings, type RoleSetting, PERMISSION_MODULES,
     type NotificationEvent, type NotificationPreference,
 } from '~/composables/useSettings';
 import { isoDate } from '~/composables/useCalendar';
@@ -26,20 +27,30 @@ const SECTIONS = [
     { id: 'annee', label: 'Année scolaire' },
     { id: 'notifs', label: 'Notifications' },
     { id: 'audit', label: "Journal d'audit" },
+    { id: 'habilitations', label: 'Habilitations' },
 ] as const;
 type SectionId = typeof SECTIONS[number]['id'];
 
 const route = useRoute();
 const router = useRouter();
+/** Ce que chaque section demande : l'année se choisit par tous, le reste suit les permissions. */
+const SECTION_PERMISSIONS: Record<SectionId, string | null> = {
+    etab: 'settings:read', niveaux: 'settings:read', annee: null, notifs: 'settings:read',
+    audit: 'audit:read', habilitations: 'user_access:write',
+};
+const visibleSection = (id: SectionId) => {
+    const permission = SECTION_PERMISSIONS[id];
+    return !permission || can(permission);
+};
+const firstVisible = () => SECTIONS.find((s) => visibleSection(s.id))?.id ?? 'annee';
 const current = ref<SectionId>(
-    (SECTIONS.find((s) => s.id === route.query.section)?.id ?? 'etab') as SectionId);
+    (SECTIONS.find((s) => s.id === route.query.section && visibleSection(s.id))?.id ?? firstVisible()) as SectionId);
 
 const canWrite = computed(() => can('settings:write'));
 const canReadAudit = computed(() => can('audit:read'));
 const establishmentId = computed(() => auth.user?.establishmentId ?? '');
 
-const shownSections = computed(() =>
-    SECTIONS.filter((section) => section.id !== 'audit' || canReadAudit.value));
+const shownSections = computed(() => SECTIONS.filter((section) => visibleSection(section.id)));
 
 function go(section: SectionId) {
     current.value = section;
@@ -328,7 +339,7 @@ const closing = ref(false);
 
 async function loadClosure() {
     const year = consultedYear.consulted.value;
-    if (!year) return;
+    if (!year || !can('settings:read')) return;
     try {
         closure.value = await settings.closure(year.id);
     } catch {
@@ -467,8 +478,105 @@ watch(current, (section) => {
     if (section === 'audit') loadAudit();
 });
 
+/* ---------------- Habilitations ---------------- */
+
+const roleSettingsApi = useRoleSettings();
+const roleSettings = ref<RoleSettings | null>(null);
+const roleDrafts = ref<Record<string, string[]>>({});
+const savingRole = ref<string | null>(null);
+
+async function loadRoleSettings() {
+    if (!can('user_access:write')) return;
+    try {
+        applyRoleSettings(await roleSettingsApi.load());
+    } catch (e) {
+        fail(e, "Les habilitations n'ont pas pu être chargées.");
+    }
+}
+
+function applyRoleSettings(data: RoleSettings) {
+    roleSettings.value = data;
+    roleDrafts.value = Object.fromEntries(data.roles.map((r) => [r.code, [...r.permissions]]));
+}
+
+const permissionGroups = computed(() => {
+    const all = roleSettings.value?.permissions ?? [];
+    return PERMISSION_MODULES
+        .map((module) => ({
+            label: module.label,
+            permissions: all.filter((p) => module.prefixes.includes(p.code.split(':')[0]!)),
+        }))
+        .filter((group) => group.permissions.length);
+});
+
+/** Cocher une permission coche ce qu'elle suppose ; décocher retire ce qui la suppose. */
+function toggleRolePermission(roleCode: string, code: string) {
+    const catalogue = roleSettings.value?.permissions ?? [];
+    const current = new Set(roleDrafts.value[roleCode] ?? []);
+    if (current.has(code)) {
+        const drop = new Set([code]);
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const p of catalogue) {
+                if (!drop.has(p.code) && current.has(p.code) && p.implies.some((i) => drop.has(i))) {
+                    drop.add(p.code);
+                    grew = true;
+                }
+            }
+        }
+        drop.forEach((d) => current.delete(d));
+    } else {
+        const stack = [code];
+        while (stack.length) {
+            const next = stack.pop()!;
+            if (current.has(next)) continue;
+            current.add(next);
+            stack.push(...(catalogue.find((p) => p.code === next)?.implies ?? []));
+        }
+    }
+    roleDrafts.value = { ...roleDrafts.value, [roleCode]: [...current] };
+}
+
+function roleChanged(role: RoleSetting) {
+    const draft = new Set(roleDrafts.value[role.code] ?? []);
+    return draft.size !== role.permissions.length || role.permissions.some((p) => !draft.has(p));
+}
+
+async function saveRole(role: RoleSetting) {
+    savingRole.value = role.code;
+    try {
+        applyRoleSettings(await roleSettingsApi.save(role.code, roleDrafts.value[role.code] ?? []));
+        done(`Habilitations du rôle ${role.name} enregistrées. Les comptes concernés les voient à leur prochain chargement de page.`);
+    } catch (e) {
+        fail(e, "Les habilitations n'ont pas pu être enregistrées.");
+    } finally {
+        savingRole.value = null;
+    }
+}
+
+async function resetRole(role: RoleSetting) {
+    savingRole.value = role.code;
+    try {
+        applyRoleSettings(await roleSettingsApi.reset(role.code));
+        done(`Le rôle ${role.name} retrouve les habilitations par défaut.`);
+    } catch (e) {
+        fail(e, "Les habilitations par défaut n'ont pas pu être rétablies.");
+    } finally {
+        savingRole.value = null;
+    }
+}
+
 onMounted(async () => {
-    await Promise.all([loadEstablishment(), loadLevels(), loadYears(), loadPreferences()]);
+    // Seul ce que le profil peut lire est demandé : un refus du serveur s'afficherait en erreur.
+    const settingsRead = can('settings:read');
+    await Promise.all([
+        settingsRead ? loadEstablishment() : Promise.resolve(),
+        settingsRead ? loadLevels() : Promise.resolve(),
+        loadYears(),
+        settingsRead ? loadPreferences() : Promise.resolve(),
+        loadRoleSettings(),
+    ]);
     if (current.value === 'audit') await loadAudit();
 });
 </script>
@@ -484,7 +592,7 @@ onMounted(async () => {
         <p v-if="saved" class="alert-success mb-3.5" role="status" @click="saved = ''">
             {{ saved }}
         </p>
-        <p v-if="!canWrite" class="alert-success mb-3.5" role="status" style="background: var(--warning-soft); color: var(--warning)">
+        <p v-if="!canWrite && can('settings:read')" class="alert-success mb-3.5" role="status" style="background: var(--warning-soft); color: var(--warning)">
             Votre rôle donne accès aux réglages en consultation seule.
         </p>
 
@@ -966,6 +1074,69 @@ onMounted(async () => {
                 </template>
 
                 <!-- ================= Journal d'audit ================= -->
+                <!-- ================= Habilitations ================= -->
+                <template v-if="current === 'habilitations' && roleSettings">
+                    <UiCard
+                        title="Habilitations"
+                        sub="Ce que chaque rôle voit et fait dans l'école. Cocher « modifier » coche « consulter »."
+                        :pad="false"
+                    >
+                        <div class="table-wrap" style="border: 0; box-shadow: none; border-radius: 0">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Permission</th>
+                                        <th v-for="role in roleSettings.roles" :key="role.code" class="text-center" style="white-space: normal">
+                                            {{ role.name }}
+                                            <span v-if="role.locked" class="block text-[10.5px] normal-case" style="color: var(--text-faint); letter-spacing: 0">toujours tout</span>
+                                            <span v-else-if="role.customized" class="block text-[10.5px] normal-case" style="color: var(--brand-600); letter-spacing: 0">réglé par l'école</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template v-for="group in permissionGroups" :key="group.label">
+                                        <tr style="background: var(--surface-sunken)">
+                                            <td :colspan="1 + roleSettings.roles.length" class="text-[11px] font-bold uppercase" style="letter-spacing: .08em; color: var(--text-label); height: 34px">
+                                                {{ group.label }}
+                                            </td>
+                                        </tr>
+                                        <tr v-for="permission in group.permissions" :key="permission.code">
+                                            <td class="text-[13px]">{{ permission.label }}</td>
+                                            <td v-for="role in roleSettings.roles" :key="role.code" class="text-center">
+                                                <input
+                                                    type="checkbox" :aria-label="`${permission.label} — ${role.name}`"
+                                                    :checked="role.locked || (roleDrafts[role.code] ?? []).includes(permission.code)"
+                                                    :disabled="role.locked || savingRole === role.code"
+                                                    @change="toggleRolePermission(role.code, permission.code)"
+                                                />
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr>
+                                        <td />
+                                        <td v-for="role in roleSettings.roles" :key="role.code" class="text-center" style="height: auto; padding: 10px 6px">
+                                            <template v-if="!role.locked">
+                                                <button
+                                                    type="button" class="btn-primary btn-sm mb-1.5"
+                                                    :disabled="!roleChanged(role) || savingRole === role.code" @click="saveRole(role)"
+                                                >Enregistrer</button>
+                                                <button
+                                                    v-if="role.customized" type="button" class="btn-ghost btn-sm"
+                                                    :disabled="savingRole === role.code" @click="resetRole(role)"
+                                                >Par défaut</button>
+                                            </template>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="hint px-4 pb-4">
+                            Chaque modification est inscrite au journal d'audit. L'administrateur d'établissement garde
+                            toujours tous les droits : c'est lui qui règle les autres.
+                        </p>
+                    </UiCard>
+                </template>
+
                 <template v-if="current === 'audit' && canReadAudit">
                     <UiCard
                         title="Journal d'audit"

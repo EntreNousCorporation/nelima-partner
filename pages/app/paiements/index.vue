@@ -12,7 +12,7 @@ const landing = computed(() => {
     if (can('accounting:read')) return '/app/paiements/transactions';
     if (can('collection:write')) return '/app/paiements/guichet';
     if (can('fee:read')) return '/app/paiements/frais';
-    return '/app/paiements/recus';
+    return '/app';
 });
 
 await navigateTo(landing.value, { replace: true });

@@ -25,5 +25,10 @@ export function usePermissions() {
         return granted.includes(permission);
     }
 
-    return { can };
+    /** Au moins une de ces permissions. */
+    function canAny(permissions: string | string[]) {
+        return (Array.isArray(permissions) ? permissions : [permissions]).some((permission) => can(permission));
+    }
+
+    return { can, canAny };
 }

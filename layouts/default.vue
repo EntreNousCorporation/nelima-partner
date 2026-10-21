@@ -25,7 +25,7 @@ const route = useRoute();
  */
 const allTabs = [
     { label: 'Tableau de bord', to: '/app', icon: 'chart-bar' },
-    { label: 'Paiements', to: '/app/paiements', icon: 'wallet', permission: 'fee:read' },
+    { label: 'Paiements', to: '/app/paiements', icon: 'wallet', permission: ['fee:read', 'collection:write'] },
     { label: 'Calendrier', to: '/app/calendrier', icon: 'calendar', permission: 'calendar:read' },
     { label: 'Classes', to: '/app/classes', icon: 'layers', permission: 'class:read' },
     { label: 'Activités', to: '/app/activites', icon: 'ball', permission: 'activity:read' },
@@ -36,8 +36,8 @@ const allTabs = [
     { label: 'Personnel', to: '/app/personnel', icon: 'briefcase', permission: 'staff:read' },
 ];
 
-const { can } = usePermissions();
-const tabs = computed(() => allTabs.filter((tab) => !tab.permission || can(tab.permission)));
+const { can, canAny } = usePermissions();
+const tabs = computed(() => allTabs.filter((tab) => !tab.permission || canAny(tab.permission)));
 
 /**
  * Un onglet reste souligné sur ses sous-écrans.
@@ -74,7 +74,9 @@ const initials = computed(() => (auth.fullName ?? '')
     .map((part: string) => part[0]?.toUpperCase())
     .join('') || '—');
 
-const canSettings = computed(() => can('settings:read'));
+// Tout compte ouvre les Paramètres : le choix de l'année consultée y est, et il vaut pour tous.
+// Les sections, elles, suivent les permissions.
+const canSettings = computed(() => true);
 const canCollect = computed(() => can('collection:write'));
 
 /* ---- Menu de compte ---- */

@@ -12,9 +12,9 @@
  */
 const items = [
     { label: 'Transactions', to: '/app/paiements/transactions', permission: 'accounting:read' },
-    { label: 'Reçus', to: '/app/paiements/recus' },
+    { label: 'Reçus', to: '/app/paiements/recus', permission: ['accounting:read', 'fee:read'] },
     { label: 'Frais & échéanciers', to: '/app/paiements/frais', permission: 'fee:read' },
-    { label: 'Relances', to: '/app/paiements/relances' },
+    { label: 'Relances', to: '/app/paiements/relances', permission: 'fee:read' },
     { label: 'Pertes', to: '/app/paiements/pertes', permission: 'writeoff:propose' },
     { label: 'Guichet', to: '/app/paiements/guichet', permission: 'collection:write' },
 ];

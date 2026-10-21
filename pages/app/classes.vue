@@ -426,7 +426,8 @@ onMounted(async () => {
                             </td>
                             <td class="num" :style="Number(row.outstandingAmount) > 0
                                 ? 'color: var(--danger)' : 'color: var(--text-faint)'">
-                                {{ fm(Number(row.outstandingAmount ?? 0)) }} F
+                                <!-- Absent quand le profil n'a pas les frais : pas de faux « 0 F ». -->
+                                {{ row.outstandingAmount == null ? '—' : `${fm(Number(row.outstandingAmount))} F` }}
                             </td>
                             <td class="text-right whitespace-nowrap">
                                 <button

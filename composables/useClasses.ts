@@ -18,8 +18,10 @@ export type SchoolClass = {
     levelLabel?: string;
     cycle?: import('~/composables/useStudents').EducationCycle;
     studentCount: number;
-    outstandingAmount: number;
-    collectedAmount: number;
+    /** Absent sans la permission des frais. */
+    outstandingAmount?: number | null;
+    /** Absent sans la permission de la comptabilité. */
+    collectedAmount?: number | null;
 };
 
 export type SchoolClassForm = {

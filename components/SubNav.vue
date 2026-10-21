@@ -9,14 +9,14 @@
  * Un onglet dont le rôle n'a pas la permission n'est pas affiché : le serveur refuserait l'appel,
  * et proposer une page qui répond 403 est une promesse que l'écran ne tient pas.
  */
-export type SubNavItem = { label: string; to: string; permission?: string };
+export type SubNavItem = { label: string; to: string; permission?: string | string[] };
 
 const props = defineProps<{ items: SubNavItem[] }>();
 
 const route = useRoute();
-const { can } = usePermissions();
+const { canAny } = usePermissions();
 
-const shown = computed(() => props.items.filter((item) => !item.permission || can(item.permission)));
+const shown = computed(() => props.items.filter((item) => !item.permission || canAny(item.permission)));
 </script>
 
 <template>

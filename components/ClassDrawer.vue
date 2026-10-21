@@ -95,6 +95,8 @@ const filling = computed(() => fillingRate(props.schoolClass));
 const over = computed(() => props.schoolClass.studentCount > props.schoolClass.capacity);
 
 const recovery = computed(() => {
+    // Sans les montants (profil sans frais ni comptabilité), pas de taux à afficher.
+    if (props.schoolClass.collectedAmount == null || props.schoolClass.outstandingAmount == null) return null;
     const collected = Number(props.schoolClass.collectedAmount ?? 0);
     const outstanding = Number(props.schoolClass.outstandingAmount ?? 0);
     const total = collected + outstanding;
@@ -213,7 +215,7 @@ onMounted(loadMembers);
                     </template>
                     <template v-else>—</template>
                 </div>
-                <p class="text-[11.5px] mt-2" style="color: var(--text-faint)">
+                <p v-if="schoolClass.outstandingAmount != null" class="text-[11.5px] mt-2" style="color: var(--text-faint)">
                     {{ formatAmount(schoolClass.outstandingAmount) }} encore dus
                 </p>
             </div>

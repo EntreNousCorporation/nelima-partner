@@ -129,7 +129,9 @@ export type AuditAction =
     | 'PORTAL_ACCESS_REVOKED'
     | 'DEBT_WRITE_OFF_PROPOSED'
     | 'DEBT_WRITE_OFF_APPROVED'
-    | 'DEBT_WRITE_OFF_REJECTED';
+    | 'DEBT_WRITE_OFF_REJECTED'
+    | 'DEBTS_CARRIED_OVER'
+    | 'ROLE_PERMISSIONS_CHANGED';
 
 export type AuditEvent = {
     id: string;
@@ -164,6 +166,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     DEBT_WRITE_OFF_PROPOSED: 'Passage en perte proposé',
     DEBT_WRITE_OFF_APPROVED: 'Passage en perte validé',
     DEBT_WRITE_OFF_REJECTED: 'Passage en perte refusé',
+    DEBTS_CARRIED_OVER: 'Impayés reportés sur l’année suivante',
+    ROLE_PERMISSIONS_CHANGED: 'Habilitations modifiées',
 };
 
 /** Les trois canaux affichés dans l'ordre de la maquette, sur toute la matrice. */
@@ -244,3 +248,35 @@ export function useSettings() {
         audit,
     };
 }
+
+/* ---------------- Habilitations ---------------- */
+
+export type RoleSetting = {
+    code: string; name: string; locked: boolean; customized: boolean; permissions: string[]; defaults?: string[] | null;
+};
+export type PermissionInfo = { code: string; label: string; implies: string[] };
+export type RoleSettings = { roles: RoleSetting[]; permissions: PermissionInfo[] };
+
+/** Ce que chaque rôle d'équipe voit et fait dans l'école. */
+export function useRoleSettings() {
+    const api = useApi();
+    return {
+        load: () => api<RoleSettings>('/role-settings'),
+        save: (roleCode: string, permissions: string[]) =>
+            api<RoleSettings>(`/role-settings/${roleCode}`, { method: 'PUT', body: { permissions } }),
+        reset: (roleCode: string) => api<RoleSettings>(`/role-settings/${roleCode}`, { method: 'DELETE' }),
+    };
+}
+
+/** Modules de l'écran des habilitations, d'après le préfixe des permissions. */
+export const PERMISSION_MODULES: { label: string; prefixes: string[] }[] = [
+    { label: 'Élèves et familles', prefixes: ['student'] },
+    { label: 'Classes', prefixes: ['class'] },
+    { label: 'Paiements', prefixes: ['fee', 'collection', 'accounting', 'reminder', 'writeoff'] },
+    { label: 'Activités', prefixes: ['activity'] },
+    { label: 'Calendrier', prefixes: ['calendar'] },
+    { label: 'Cantine', prefixes: ['canteen'] },
+    { label: 'Transport', prefixes: ['transport'] },
+    { label: 'Personnel', prefixes: ['staff', 'attendance'] },
+    { label: 'Paramètres et accès', prefixes: ['settings', 'audit', 'user_access'] },
+];
