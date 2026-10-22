@@ -6,6 +6,8 @@ import { fullName, type StaffMember } from '~/composables/useStaff';
 
 const auth = useAuthStore();
 const { can } = usePermissions();
+/** Le reste dû par classe n'est renvoyé qu'avec les frais : sans eux, pas de colonne vide. */
+const canSeeDues = computed(() => can('fee:read'));
 const { list, create, update, remove } = useClasses();
 const { establishmentLevels } = useStudents();
 const { list: listStaff } = useStaff();
@@ -361,12 +363,12 @@ onMounted(async () => {
                             <th>Titulaire</th>
                             <th>Salle</th>
                             <th style="width: 180px">Remplissage</th>
-                            <th class="r">Reste dû</th>
+                            <th v-if="canSeeDues" class="r">Reste dû</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <TableSkeleton v-if="loading" :columns="8" />
+                        <TableSkeleton v-if="loading" :columns="canSeeDues ? 8 : 7" />
                         <tr
                             v-for="row in filtered" v-else :key="row.id" class="cl"
                             @click="opened = row"
@@ -424,7 +426,7 @@ onMounted(async () => {
                                     >{{ row.studentCount }}/{{ row.capacity }}</span>
                                 </div>
                             </td>
-                            <td class="num" :style="Number(row.outstandingAmount) > 0
+                            <td v-if="canSeeDues" class="num" :style="Number(row.outstandingAmount) > 0
                                 ? 'color: var(--danger)' : 'color: var(--text-faint)'">
                                 <!-- Absent quand le profil n'a pas les frais : pas de faux « 0 F ». -->
                                 {{ row.outstandingAmount == null ? '—' : `${fm(Number(row.outstandingAmount))} F` }}

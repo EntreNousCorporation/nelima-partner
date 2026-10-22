@@ -228,7 +228,7 @@ onMounted(async () => {
     <div>
         <PageHead title="Paiements" :sub="`Guichet · ${todayLabel}`">
             <template #actions>
-                <NuxtLink to="/app/paiements/recus" class="btn-secondary">Tous les reçus</NuxtLink>
+                <NuxtLink v-if="!ownCashOnly" to="/app/paiements/recus" class="btn-secondary">Tous les reçus</NuxtLink>
             </template>
         </PageHead>
 
@@ -438,7 +438,7 @@ onMounted(async () => {
                 title="Caisse du jour" :sub="ownCashOnly ? `${todayLabel} · vos encaissements` : todayLabel"
             >
                 <template #action>
-                    <NuxtLink to="/app/paiements/recus" class="btn-secondary btn-sm">Historique</NuxtLink>
+                    <NuxtLink v-if="!ownCashOnly" to="/app/paiements/recus" class="btn-secondary btn-sm">Historique</NuxtLink>
                 </template>
 
                 <div class="flex flex-wrap" style="border-bottom: 1px solid var(--border)">
