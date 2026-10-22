@@ -56,14 +56,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 <template>
     <span
         v-if="!groupWide"
-        class="hidden md:flex items-center h-[34px] px-2.5 rounded-lg text-[13px] font-semibold truncate max-w-xs"
+        class="hidden md:flex items-center gap-2 h-[34px] px-2.5 rounded-lg text-[13px] font-semibold max-w-xs"
         style="background: rgba(255,255,255,.09)"
-    >{{ auth.user?.establishmentName ?? 'Établissement' }}</span>
+    >
+        <img v-if="auth.user?.establishmentLogo" :src="auth.user.establishmentLogo" alt="" class="school-logo" />
+        <span class="truncate">{{ auth.user?.establishmentName ?? 'Établissement' }}</span>
+    </span>
     <div v-else class="relative hidden md:block">
         <button
             type="button" class="flex items-center gap-1.5 h-[34px] px-2.5 rounded-lg text-[13px] font-semibold max-w-xs"
             style="background: rgba(255,255,255,.09)" :aria-expanded="open" aria-haspopup="listbox" @click="toggle"
         >
+            <img v-if="auth.user?.establishmentLogo" :src="auth.user.establishmentLogo" alt="" class="school-logo" />
             <span class="truncate">{{ auth.user?.establishmentName ?? 'Établissement' }}</span>
             <BoIcon name="chevron-down" :size="14" />
         </button>
@@ -81,7 +85,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 class="flex items-center justify-between w-full px-3 py-2 text-left text-[13px] hover:bg-[var(--surface-sunken)]"
                 :disabled="switching" @click="choose(site)"
             >
-                <span>
+                <img v-if="site.logo" :src="site.logo" alt="" class="school-logo mr-2" style="border: 1px solid var(--border)" />
+                <span class="flex-1">
                     <b class="block font-semibold">{{ site.name }}</b>
                     <span v-if="site.city" class="text-[11.5px]" style="color: var(--text-faint)">{{ site.city }}</span>
                 </span>
@@ -96,3 +101,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Le logo de l'école, sur fond blanc arrondi : un logo sombre resterait lisible sur la barre bleue nuit. */
+.school-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    object-fit: contain;
+    background: #fff;
+    padding: 2px;
+    flex-shrink: 0;
+}
+</style>

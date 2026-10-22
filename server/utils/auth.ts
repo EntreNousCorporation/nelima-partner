@@ -24,6 +24,8 @@ export type SchoolUser = {
     groupWide?: boolean;
     /** Groupe scolaire du site affiché, s'il en fait partie. */
     schoolGroupName?: string | null;
+    /** Logo de l'école affichée, pour la barre du haut. */
+    establishmentLogo?: string | null;
 };
 
 export type SessionData = {

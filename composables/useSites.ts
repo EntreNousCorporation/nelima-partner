@@ -1,5 +1,5 @@
 /** Groupes scolaires à plusieurs sites : le site affiché, et la vue « Tous les sites ». */
-export type Site = { id: string; name: string; city?: string | null };
+export type Site = { id: string; name: string; city?: string | null; logo?: string | null };
 export type Sites = { groupName?: string | null; groupWide: boolean; homeId: string; currentId: string; sites: Site[] };
 export type SiteFigures = {
     site: Site; students: number; staff: number; expected: number; collected: number; overdue: number; collectionRate: number;

@@ -42,6 +42,7 @@ export default defineEventHandler(async (event) => {
                 permissions: raw.permissions ?? user.permissions,
                 groupWide: !!raw.groupWide,
                 schoolGroupName: raw.schoolGroupName ?? null,
+                establishmentLogo: raw.establishmentLogo ?? null,
                 establishmentId: raw.establishmentId ?? user.establishmentId,
             };
             await session.update({ user: refreshed, profileCheckedAt: Date.now() });

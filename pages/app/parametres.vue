@@ -216,6 +216,13 @@ async function saveLogo() {
         });
         logoPreview.value = null;
         await loadEstablishment();
+        // La barre du haut affiche le logo : le profil est relu tout de suite.
+        try {
+            const { user } = await $fetch<{ user: any }>('/api/me', { query: { refresh: '1' } });
+            auth.setUser(user);
+        } catch {
+            // Sans conséquence : la barre se mettra à jour au prochain chargement.
+        }
         done('Logo enregistré.');
     } catch (e) {
         fail(e, "Le logo n'a pas pu être enregistré.");

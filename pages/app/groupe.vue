@@ -84,8 +84,13 @@ onMounted(load);
                         <TableSkeleton v-if="loading" :columns="8" />
                         <tr v-for="row in data?.sites ?? []" v-else :key="row.site.id">
                             <td>
+                                <div class="flex items-center gap-2.5">
+                                <AvatarBadge :name="row.site.name" :src="row.site.logo" :size="30" />
+                                <div>
                                 <b class="block text-[13px]" style="color: var(--navy)">{{ row.site.name }}</b>
                                 <span v-if="row.site.city" class="text-[11.5px]" style="color: var(--text-faint)">{{ row.site.city }}</span>
+                                </div>
+                                </div>
                             </td>
                             <td class="num">{{ row.students.toLocaleString('fr-FR') }}</td>
                             <td class="num">{{ row.staff }}</td>

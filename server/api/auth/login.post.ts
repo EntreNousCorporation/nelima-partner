@@ -77,6 +77,7 @@ export default defineEventHandler(async (event) => {
         permissions: raw.permissions ?? [],
         groupWide: !!raw.groupWide,
         schoolGroupName: raw.schoolGroupName ?? null,
+        establishmentLogo: raw.establishmentLogo ?? null,
     };
 
     const session = await getSchoolSession(event);
