@@ -4,9 +4,9 @@ import { WEEKDAYS, isoDay, termSchedule } from '~/composables/useCanteen';
 import { boAmount, fmtNumber as fmt, pillStyle } from '~/composables/useBoTones';
 import { PAYMENT_STATUSES, studentPhotoUrl, type Student } from '~/composables/useStudents';
 import {
-    DRIVER_DOCUMENTS, LICENSE_CATEGORIES, LINE_STATUSES, hhmm,
+    DRIVER_DOCUMENTS, LICENSE_CATEGORIES, LINE_STATUSES, VEHICLE_KINDS, hhmm,
     type LineBody, type LineStatus, type TransportDriver, type TransportLine, type TransportOverview,
-    type TransportRider, type TransportStop,
+    type TransportRider, type TransportStop, type TransportVehicle, type VehicleKind,
 } from '~/composables/useTransport';
 
 /**
@@ -27,6 +27,7 @@ const schoolName = computed(() => auth.user?.establishmentName ?? 'École');
 const overview = ref<TransportOverview | null>(null);
 const lines = ref<TransportLine[]>([]);
 const drivers = ref<TransportDriver[]>([]);
+const vehicles = ref<TransportVehicle[]>([]);
 const loading = ref(true);
 const error = ref('');
 const notice = ref('');
@@ -40,6 +41,19 @@ const paymentOf = (status: string) => PAYMENT_STATUSES.find((p) => p.value === s
 const telHref = (phone?: string | null) => (phone ? `tel:${phone.replace(/\s+/g, '')}` : undefined);
 const activeLines = computed(() => lines.value.filter((l) => l.active));
 const availableDrivers = computed(() => drivers.value.filter((d) => d.active && !d.lines.length));
+const availableVehicles = computed(() => vehicles.value.filter((v) => v.active && !v.lines.length));
+/** « 31/03/2027 ». */
+const ddmmyyyy = (iso?: string | null) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR') : '');
+const kindShort = (kind: VehicleKind) => VEHICLE_KINDS.find((k) => k.value === kind)?.short ?? 'Car';
+/** Échéance d'un document : dépassée, dans les 30 jours, ou à jour. */
+function deadlineTone(iso?: string | null): 'late' | 'warn' | null {
+    if (!iso) return null;
+    if (iso < today) return 'late';
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 30);
+    return iso <= isoDay(soon) ? 'warn' : null;
+}
+const driverLicense = (d: TransportDriver) => `Permis ${d.licenseCategory || '—'}${d.licenseExpiry ? ` · exp. ${d.licenseExpiry.slice(0, 4)}` : ''}`;
 
 /** Arrivée à l'école : le dernier arrêt, plus l'écart moyen entre deux arrêts (10 min à défaut). */
 function schoolArrival(stops: { pickupTime?: string | null }[]) {
@@ -57,10 +71,11 @@ async function load() {
     loading.value = true;
     error.value = '';
     try {
-        const [o, l, d] = await Promise.all([transport.overview(), transport.lines(), transport.drivers()]);
+        const [o, l, d, v] = await Promise.all([transport.overview(), transport.lines(), transport.drivers(), transport.vehicles()]);
         overview.value = o;
         lines.value = l;
         drivers.value = d;
+        vehicles.value = v;
         if (opened.value) opened.value = l.find((x) => x.id === opened.value!.id) ?? null;
     } catch (e: any) {
         error.value = e?.data?.debugMessage ?? "Le transport n'a pas pu être chargé.";
@@ -86,7 +101,7 @@ function exportCsv() {
 
 /** Corps d'enregistrement d'une ligne telle qu'elle est, pour n'en changer qu'une partie. */
 const bodyOf = (line: TransportLine, stops: TransportStop[] = line.stops): LineBody => ({
-    name: line.name, vehiclePlate: line.vehiclePlate, capacity: line.capacity, driverId: line.driverId,
+    name: line.name, vehicleId: line.vehicleId, vehiclePlate: line.vehiclePlate, capacity: line.capacity, driverId: line.driverId,
     morningDeparture: hhmm(line.morningDeparture) || null, eveningDeparture: hhmm(line.eveningDeparture) || null,
     days: line.days, attendant: line.attendant, startDate: line.startDate, monthlyPrice: line.monthlyPrice, active: line.active,
     stops: stops.map((s) => ({ id: s.id, name: s.name, pickupTime: hhmm(s.pickupTime) || null, latitude: s.latitude, longitude: s.longitude })),
@@ -149,26 +164,31 @@ type StopRow = { id?: string; name: string; pickupTime: string; latitude?: numbe
 const lineOpen = ref(false);
 const editingLine = ref<TransportLine | null>(null);
 const lineForm = reactive({
-    name: '', startDate: today, monthlyPrice: '' as string | number, vehiclePlate: '', capacity: 50, driverId: '',
+    name: '', monthlyPrice: '' as string | number, vehicleId: '', driverId: '',
     attendant: '', morningDeparture: '06:30', eveningDeparture: '16:45',
     days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as string[], stops: [] as StopRow[], announce: false, active: true,
 });
 const lineTried = ref(false);
 const savingLine = ref(false);
-const CAPACITIES = [30, 40, 50, 60, 70];
-const capacityOptions = computed(() => [...new Set([...CAPACITIES, Number(lineForm.capacity)])].sort((a, b) => a - b));
+/** Véhicules et chauffeurs proposés : les disponibles, plus ceux déjà affectés à la ligne modifiée. */
+const lineVehicles = computed(() => vehicles.value.filter((v) => v.active
+    && (!v.lines.length || v.id === editingLine.value?.vehicleId || v.id === lineForm.vehicleId)));
+const lineDrivers = computed(() => drivers.value.filter((d) => d.active
+    && (!d.lines.length || d.id === editingLine.value?.driverId || d.id === lineForm.driverId)));
+const pickedVehicle = computed(() => vehicles.value.find((v) => v.id === lineForm.vehicleId) ?? null);
+const pickedDriver = computed(() => drivers.value.find((d) => d.id === lineForm.driverId) ?? null);
 
 function openLineForm(line?: TransportLine) {
     editingLine.value = line ?? null;
     lineTried.value = false;
     Object.assign(lineForm, line ? {
-        name: line.name, startDate: line.startDate ?? today, monthlyPrice: line.monthlyPrice, vehiclePlate: line.vehiclePlate ?? '',
-        capacity: line.capacity, driverId: line.driverId ?? '', attendant: line.attendant ?? '',
+        name: line.name, monthlyPrice: line.monthlyPrice, vehicleId: line.vehicleId ?? '',
+        driverId: line.driverId ?? '', attendant: line.attendant ?? '',
         morningDeparture: hhmm(line.morningDeparture), eveningDeparture: hhmm(line.eveningDeparture), days: [...line.days],
         stops: line.stops.map((s) => ({ id: s.id, name: s.name, pickupTime: hhmm(s.pickupTime), latitude: s.latitude, longitude: s.longitude })),
         announce: false, active: line.active,
     } : {
-        name: `Ligne ${lines.value.length + 1}`, startDate: today, monthlyPrice: '', vehiclePlate: '', capacity: 50, driverId: '',
+        name: `Ligne ${lines.value.length + 1}`, monthlyPrice: '', vehicleId: '', driverId: '',
         attendant: '', morningDeparture: '06:30', eveningDeparture: '16:45', days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
         stops: [{ name: '', pickupTime: '06:30' }], announce: false, active: true,
     });
@@ -198,8 +218,17 @@ function toggleLineDay(day: string) {
     lineForm.days = lineForm.days.includes(day) ? lineForm.days.filter((d) => d !== day) : [...lineForm.days, day];
 }
 
-const lineValid = computed(() => lineForm.name.trim() && lineForm.vehiclePlate.trim() && lineForm.driverId
+const lineValid = computed(() => lineForm.name.trim() && lineForm.vehicleId && lineForm.driverId
     && lineForm.monthlyPrice !== '' && lineForm.stops.length > 0 && lineForm.stops.every((s) => s.name.trim()));
+
+function onVehicleSelect(event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
+    if (value === '__new') {
+        lineForm.vehicleId = '';
+        (event.target as HTMLSelectElement).value = '';
+        openVehicleForm(undefined, true);
+    }
+}
 
 function onDriverSelect(event: Event) {
     const value = (event.target as HTMLSelectElement).value;
@@ -215,17 +244,21 @@ async function saveLine() {
     if (!lineValid.value) return;
     savingLine.value = true;
     const body: LineBody = {
-        name: lineForm.name.trim(), vehiclePlate: lineForm.vehiclePlate.trim(), capacity: Number(lineForm.capacity),
+        name: lineForm.name.trim(), vehicleId: lineForm.vehicleId,
         driverId: lineForm.driverId || null, morningDeparture: lineForm.morningDeparture || null,
         eveningDeparture: lineForm.eveningDeparture || null, days: lineForm.days, attendant: lineForm.attendant.trim() || null,
-        startDate: lineForm.startDate || null, announce: !editingLine.value && lineForm.announce,
+        announce: !editingLine.value && lineForm.announce,
         monthlyPrice: Number(lineForm.monthlyPrice), active: lineForm.active,
         stops: lineForm.stops.map((s) => ({ id: s.id, name: s.name.trim(), pickupTime: s.pickupTime || null, latitude: s.latitude, longitude: s.longitude })),
     };
     try {
-        if (editingLine.value) await transport.updateLine(editingLine.value.id, body);
-        else await transport.createLine(body);
-        notice.value = editingLine.value ? `${body.name} enregistrée.` : `${body.name} créée${body.announce ? ' et annoncée aux familles' : ''}.`;
+        if (editingLine.value) {
+            await transport.updateLine(editingLine.value.id, body);
+            notice.value = `${body.name} enregistrée.`;
+        } else {
+            const created = await transport.createLine(body);
+            lineFlash.value = { line: created, announced: !!body.announce };
+        }
         lineOpen.value = false;
         await load();
     } catch (e) {
@@ -235,12 +268,34 @@ async function saveLine() {
     }
 }
 
+/** Ligne tout juste créée : bandeau de confirmation en tête de page, comme dans la maquette. */
+const lineFlash = ref<{ line: TransportLine; announced: boolean } | null>(null);
+const lineFlashText = computed(() => {
+    const flash = lineFlash.value;
+    if (!flash) return '';
+    const l = flash.line;
+    return `${l.stops.length + 1} arrêts · car ${l.vehiclePlate ?? '—'} · ${l.capacity} places · chauffeur ${l.driverName ?? '—'}${flash.announced ? ' · familles de l’école notifiées' : ''}`;
+});
+
+function showFlashedLine() {
+    const line = lines.value.find((l) => l.id === lineFlash.value?.line.id) ?? lineFlash.value?.line;
+    lineFlash.value = null;
+    if (line) openLine(line);
+}
+
 /* ---------------- Chauffeur ---------------- */
 const driverOpen = ref(false);
 const editingDriver = ref<TransportDriver | null>(null);
 const driverForAssignment = ref(false);
 const driverForm = reactive({ fullName: '', phone: '', licenseCategory: 'D', licenseExpiry: '', documents: [] as string[], active: true });
 const driverTried = ref(false);
+const driverFlash = ref<{ name: string; updated: boolean; missing: number } | null>(null);
+const driverFlashText = computed(() => {
+    const f = driverFlash.value;
+    if (!f) return '';
+    if (f.updated) return `Informations enregistrées${f.missing ? ` · ${f.missing} pièce(s) manquante(s)` : ' · dossier complet'}`;
+    return f.missing ? `${f.missing} pièce(s) manquante(s) · disponible pour une affectation` : 'Dossier complet · disponible pour une affectation';
+});
 
 function openDriverForm(driver?: TransportDriver, forLine = false) {
     editingDriver.value = driver ?? null;
@@ -278,11 +333,74 @@ async function saveDriver() {
             ? await transport.updateDriver(editingDriver.value.id, body)
             : await transport.createDriver(body);
         drivers.value = await transport.drivers();
-        if (driverForAssignment.value) lineForm.driverId = saved.id;
+        if (driverForAssignment.value) {
+            lineForm.driverId = saved.id;
+        } else {
+            driverFlash.value = { name: `${saved.lastName} ${saved.firstName}`, updated: !!editingDriver.value, missing: DRIVER_DOCUMENTS.length - saved.documents.length };
+            if (editingDriver.value) await load();
+        }
         driverOpen.value = false;
-        notice.value = `${saved.lastName} ${saved.firstName} enregistré.`;
     } catch (e) {
         fail(e, "Le chauffeur n'a pas pu être enregistré.");
+    }
+}
+
+/* ---------------- Véhicule ---------------- */
+const vehicleOpen = ref(false);
+const editingVehicle = ref<TransportVehicle | null>(null);
+const vehicleForAssignment = ref(false);
+const vehicleForm = reactive({ plate: '', model: '', kind: 'CAR' as VehicleKind, capacity: 50, insuranceExpiry: '', technicalVisit: '' });
+const vehicleTried = ref(false);
+const savingVehicle = ref(false);
+const vehicleFlash = ref<{ vehicle: TransportVehicle; updated: boolean } | null>(null);
+const CAR_CAPACITIES = [30, 40, 50, 60, 70];
+/** Un minibus, c'est 9 places ; un car, de 30 à 70 — plus la valeur déjà enregistrée si elle sort de la liste. */
+const vehicleCapacities = computed(() => (vehicleForm.kind === 'MINIBUS' ? [9]
+    : [...new Set([...CAR_CAPACITIES, ...(editingVehicle.value?.kind === 'CAR' ? [editingVehicle.value.capacity] : [])])].sort((a, b) => a - b)));
+const plateBad = computed(() => vehicleTried.value && vehicleForm.plate.trim().length < 6);
+const insuranceBad = computed(() => vehicleTried.value && !vehicleForm.insuranceExpiry);
+
+function openVehicleForm(vehicle?: TransportVehicle, forLine = false) {
+    editingVehicle.value = vehicle ?? null;
+    vehicleForAssignment.value = forLine;
+    vehicleTried.value = false;
+    Object.assign(vehicleForm, vehicle ? {
+        plate: vehicle.plate, model: vehicle.model ?? '', kind: vehicle.kind, capacity: vehicle.capacity,
+        insuranceExpiry: vehicle.insuranceExpiry ?? '', technicalVisit: vehicle.technicalVisit ?? '',
+    } : { plate: '', model: '', kind: 'CAR', capacity: 50, insuranceExpiry: '', technicalVisit: '' });
+    vehicleOpen.value = true;
+}
+
+function onKindChange() {
+    if (vehicleForm.kind === 'MINIBUS') vehicleForm.capacity = 9;
+    else if (vehicleForm.capacity < 30) vehicleForm.capacity = 50;
+}
+
+async function saveVehicle() {
+    vehicleTried.value = true;
+    if (plateBad.value || insuranceBad.value) return;
+    savingVehicle.value = true;
+    const body = {
+        plate: vehicleForm.plate.trim().toUpperCase(), model: vehicleForm.model.trim() || null, kind: vehicleForm.kind,
+        capacity: Number(vehicleForm.capacity), insuranceExpiry: vehicleForm.insuranceExpiry,
+        technicalVisit: vehicleForm.technicalVisit || null, active: editingVehicle.value?.active ?? true,
+    };
+    try {
+        const saved = editingVehicle.value
+            ? await transport.updateVehicle(editingVehicle.value.id, body)
+            : await transport.createVehicle(body);
+        if (vehicleForAssignment.value) {
+            vehicles.value = await transport.vehicles();
+            lineForm.vehicleId = saved.id;
+        } else {
+            vehicleFlash.value = { vehicle: saved, updated: !!editingVehicle.value };
+            await load();
+        }
+        vehicleOpen.value = false;
+    } catch (e) {
+        fail(e, "Le véhicule n'a pas pu être enregistré.");
+    } finally {
+        savingVehicle.value = false;
     }
 }
 
@@ -420,6 +538,7 @@ onMounted(load);
             </div>
             <div class="acts">
                 <button type="button" class="btn out" :disabled="!activeLines.length" @click="openMap"><BoIcon name="map-pin" :size="16" />Carte des arrêts</button>
+                <button v-if="can('transport:write')" type="button" class="btn out" @click="openVehicleForm()"><BoIcon name="bus" :size="16" />Ajouter un véhicule</button>
                 <button v-if="can('transport:write')" type="button" class="btn out" @click="openDriverForm()"><BoIcon name="user-check" :size="16" />Ajouter un chauffeur</button>
                 <button v-if="can('transport:write')" type="button" class="btn pr" @click="openLineForm()"><BoIcon name="plus" :size="16" />Nouvelle ligne</button>
             </div>
@@ -427,6 +546,14 @@ onMounted(load);
 
         <p v-if="error" class="alert-danger" style="margin-bottom: 14px" role="alert">{{ error }}</p>
         <p v-if="notice" class="alert-success" style="margin-bottom: 14px">{{ notice }}</p>
+        <BoBanner v-if="lineFlash" tone="ok" icon="check-circle" :title="`${lineFlash.line.name} créée`" :text="lineFlashText">
+            <template #action>
+                <div style="display: flex; gap: 8px">
+                    <button type="button" class="btn out sm" @click="showFlashedLine">Voir les arrêts</button>
+                    <button type="button" class="btn gh sm" @click="lineFlash = null">Fermer</button>
+                </div>
+            </template>
+        </BoBanner>
 
         <!-- ============ Alertes du matin ============ -->
         <div
@@ -575,10 +702,15 @@ onMounted(load);
                 </div>
                 <button v-if="can('transport:write')" type="button" class="btn out sm" @click="openDriverForm()"><BoIcon name="plus" :size="15" />Ajouter un chauffeur</button>
             </div>
+            <div v-if="driverFlash" style="padding: 12px 15px 0">
+                <BoBanner tone="ok" icon="check-circle" :title="`${driverFlash.name} ${driverFlash.updated ? 'mis à jour' : 'ajouté'}`" :text="driverFlashText">
+                    <template #action><button type="button" class="btn gh sm" @click="driverFlash = null">Fermer</button></template>
+                </BoBanner>
+            </div>
             <div style="overflow-x: auto">
                 <table class="tb">
                     <thead>
-                        <tr><th>Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Dossier</th><th>Affectation</th></tr>
+                        <tr><th>Chauffeur</th><th>Téléphone</th><th>Permis</th><th>Dossier</th><th>Affectation</th><th v-if="can('transport:write')" /></tr>
                     </thead>
                     <tbody>
                         <tr
@@ -601,6 +733,9 @@ onMounted(load);
                                 <span v-else-if="d.active" class="pill" :style="pillStyle('info')">Disponible</span>
                                 <span v-else class="pill" :style="pillStyle('mute')">Inactif</span>
                             </td>
+                            <td v-if="can('transport:write')" style="text-align: right">
+                                <button type="button" class="btn gh sm" @click.stop="openDriverForm(d)"><BoIcon name="edit" :size="15" />Modifier</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -608,6 +743,59 @@ onMounted(load);
             <div v-if="!loading && !drivers.length" class="empty">
                 <h4>Aucun chauffeur</h4>
                 <p>Ajoutez les chauffeurs avant de leur confier une ligne.</p>
+            </div>
+        </section>
+
+        <!-- ============ Véhicules ============ -->
+        <section class="card" style="margin-top: 14px">
+            <div class="card-h">
+                <div>
+                    <h3>Véhicules</h3>
+                    <div class="sub">{{ vehicles.length }} {{ plural(vehicles.length, 'véhicule') }} · {{ availableVehicles.length }} {{ plural(availableVehicles.length, 'disponible') }}</div>
+                </div>
+                <button v-if="can('transport:write')" type="button" class="btn out sm" @click="openVehicleForm()"><BoIcon name="plus" :size="15" />Ajouter un véhicule</button>
+            </div>
+            <div v-if="vehicleFlash" style="padding: 12px 15px 0">
+                <BoBanner
+                    tone="ok" icon="check-circle" :title="`${vehicleFlash.vehicle.plate} ${vehicleFlash.updated ? 'mis à jour' : 'ajouté'}`"
+                    :text="`${kindShort(vehicleFlash.vehicle.kind)} · ${vehicleFlash.vehicle.capacity} places · assuré jusqu’au ${ddmmyyyy(vehicleFlash.vehicle.insuranceExpiry)}${vehicleFlash.updated ? '' : ' · disponible pour une affectation'}`"
+                >
+                    <template #action><button type="button" class="btn gh sm" @click="vehicleFlash = null">Fermer</button></template>
+                </BoBanner>
+            </div>
+            <div style="overflow-x: auto">
+                <table class="tb">
+                    <thead>
+                        <tr><th>Immatriculation</th><th>Type</th><th>Places</th><th>Assurance</th><th>Affectation</th><th v-if="can('transport:write')" /></tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="v in vehicles" :key="v.id" :class="{ cl: can('transport:write') }"
+                            :style="v.active ? undefined : 'opacity: 0.55'" @click="can('transport:write') && openVehicleForm(v)"
+                        >
+                            <td><b class="nu" style="font: 700 13px / 1 Inter; color: var(--nv)">{{ v.plate }}</b></td>
+                            <td style="font: 500 12.5px / 1 Inter; color: var(--tx2)">{{ kindShort(v.kind) }}{{ v.model ? ` · ${v.model}` : '' }}</td>
+                            <td class="nu" style="font: 500 12.5px / 1 Inter; color: var(--tx2)">{{ v.capacity }}</td>
+                            <td>
+                                <!-- Échéance proche ou dépassée : en pastille, pour qu'elle saute aux yeux. -->
+                                <span v-if="deadlineTone(v.insuranceExpiry)" class="pill nu" :style="pillStyle(deadlineTone(v.insuranceExpiry)!)">{{ ddmmyyyy(v.insuranceExpiry) }}</span>
+                                <span v-else-if="v.insuranceExpiry" class="nu" style="font: 500 12.5px / 1 Inter; color: var(--tx2)">{{ ddmmyyyy(v.insuranceExpiry) }}</span>
+                                <span v-else class="pill" :style="pillStyle('warn')">À renseigner</span>
+                            </td>
+                            <td>
+                                <template v-if="v.lines.length"><span v-for="name in v.lines" :key="name" class="tag" style="margin-right: 4px">{{ name }}</span></template>
+                                <span v-else class="pill" :style="pillStyle('info')">Disponible</span>
+                            </td>
+                            <td v-if="can('transport:write')" style="text-align: right">
+                                <button type="button" class="btn gh sm" @click.stop="openVehicleForm(v)"><BoIcon name="edit" :size="15" />Modifier</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div v-if="!loading && !vehicles.length" class="empty">
+                <h4>Aucun véhicule</h4>
+                <p>Ajoutez les cars de l’école avant de leur confier une ligne.</p>
             </div>
         </section>
 
@@ -713,7 +901,7 @@ onMounted(load);
         >
             <div style="margin-bottom: 20px">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px"><p class="sec">Ligne</p></div>
-                <div class="frm">
+                <div class="frm" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)">
                     <div class="fld" :class="{ bad: lineTried && !lineForm.name.trim() }">
                         <label for="line-name">Nom de la ligne *</label>
                         <input id="line-name" v-model="lineForm.name" placeholder="Ex. Ligne 7" maxlength="64" />
@@ -721,10 +909,6 @@ onMounted(load);
                     <div class="fld">
                         <label for="line-school">Établissement desservi</label>
                         <select id="line-school" disabled><option>{{ schoolName }}</option></select>
-                    </div>
-                    <div class="fld">
-                        <label for="line-start">Mise en service</label>
-                        <NelimaDateField id="line-start" v-model="lineForm.startDate" />
                     </div>
                     <div class="fld" :class="{ bad: lineTried && lineForm.monthlyPrice === '' }">
                         <label for="line-price">Tarif mensuel (FCFA) *</label>
@@ -735,25 +919,20 @@ onMounted(load);
 
             <div style="margin-bottom: 20px">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px"><p class="sec">Véhicule &amp; équipage</p></div>
-                <div class="frm">
-                    <div class="fld" :class="{ bad: lineTried && !lineForm.vehiclePlate.trim() }">
-                        <label for="line-plate">Immatriculation du car *</label>
-                        <input id="line-plate" v-model="lineForm.vehiclePlate" placeholder="Ex. AB 1234 CI" maxlength="16" />
-                    </div>
-                    <div class="fld">
-                        <label for="line-capacity">Nombre de places</label>
-                        <select id="line-capacity" v-model.number="lineForm.capacity">
-                            <option v-for="c in capacityOptions" :key="c" :value="c">{{ c }} places</option>
+                <div class="frm" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)">
+                    <div class="fld" :class="{ bad: lineTried && !lineForm.vehicleId }">
+                        <label for="line-vehicle">Véhicule *</label>
+                        <select id="line-vehicle" v-model="lineForm.vehicleId" @change="onVehicleSelect">
+                            <option value="">Choisir un véhicule disponible</option>
+                            <option v-for="v in lineVehicles" :key="v.id" :value="v.id">{{ v.plate }} · {{ v.capacity }} places</option>
+                            <option v-if="can('transport:write')" value="__new">+ Ajouter un nouveau véhicule…</option>
                         </select>
                     </div>
                     <div class="fld" :class="{ bad: lineTried && !lineForm.driverId }">
                         <label for="line-driver">Chauffeur *</label>
                         <select id="line-driver" v-model="lineForm.driverId" @change="onDriverSelect">
                             <option value="">Choisir un chauffeur disponible</option>
-                            <option
-                                v-for="d in drivers.filter((x) => x.active && (!x.lines.length || x.id === editingLine?.driverId || x.id === lineForm.driverId))"
-                                :key="d.id" :value="d.id"
-                            >{{ d.lastName }} {{ d.firstName }}</option>
+                            <option v-for="d in lineDrivers" :key="d.id" :value="d.id">{{ d.lastName }} {{ d.firstName }}</option>
                             <option value="__new">+ Ajouter un nouveau chauffeur…</option>
                         </select>
                     </div>
@@ -761,6 +940,18 @@ onMounted(load);
                         <label for="line-attendant">Accompagnateur</label>
                         <input id="line-attendant" v-model="lineForm.attendant" placeholder="Facultatif · obligatoire en maternelle" maxlength="96" />
                     </div>
+                </div>
+                <div v-if="pickedVehicle && !vehicleOpen" style="margin-top: 10px">
+                    <BoBanner
+                        icon="bus" :title="pickedVehicle.plate"
+                        :text="`${kindShort(pickedVehicle.kind)}${pickedVehicle.model ? ` ${pickedVehicle.model}` : ''} · ${pickedVehicle.capacity} places · aucune autre ligne affectée`"
+                    />
+                </div>
+                <div v-if="pickedDriver && !driverOpen" style="margin-top: 10px">
+                    <BoBanner
+                        icon="user-check" :title="`${pickedDriver.lastName} ${pickedDriver.firstName}`"
+                        :text="`${pickedDriver.phone ?? '—'} · ${driverLicense(pickedDriver)} · aucune autre ligne affectée`"
+                    />
                 </div>
             </div>
 
@@ -805,7 +996,7 @@ onMounted(load);
                     <div class="sic"><BoIcon name="bell" :size="17" /></div>
                     <div style="flex: 1 1 0%; min-width: 0">
                         <b>Annoncer la ligne aux familles</b>
-                        <p>Notification aux familles de l’école · inscriptions ouvertes{{ lineForm.startDate ? ` dès le ${new Date(`${lineForm.startDate}T12:00:00`).toLocaleDateString('fr-FR')}` : '' }}.</p>
+                        <p>Notification aux familles de l’école · inscriptions ouvertes dès la création.</p>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0">
                         <button
@@ -833,14 +1024,15 @@ onMounted(load);
             <template #footer>
                 <button type="button" class="btn gh" @click="lineOpen = false">Annuler</button>
                 <div style="flex: 1 1 0%" />
+                <span v-if="lineTried && !lineValid" style="font: 600 12px / 1 Inter; color: var(--rd-d)">Complétez les champs signalés</span>
                 <button type="button" class="btn pr" :disabled="savingLine" @click="saveLine"><BoIcon name="check" :size="16" />{{ editingLine ? 'Enregistrer' : 'Créer la ligne' }}</button>
             </template>
         </BoModal>
 
         <!-- ============ Chauffeur ============ -->
         <BoModal
-            v-if="driverOpen" :title="editingDriver ? `${editingDriver.lastName} ${editingDriver.firstName}` : 'Ajouter un chauffeur'"
-            icon="user-check" :width="620" sub="Il pourra ensuite être affecté à une ligne" @close="driverOpen = false"
+            v-if="driverOpen" :title="editingDriver ? 'Modifier le chauffeur' : 'Ajouter un chauffeur'"
+            icon="user-check" :width="620" :sub="editingDriver ? `${editingDriver.lastName} ${editingDriver.firstName}` : 'Il pourra ensuite être affecté à une ligne'" @close="driverOpen = false"
         >
             <div class="frm">
                 <div class="fld" :class="{ bad: driverTried && (!nameParts.lastName || !nameParts.firstName) }">
@@ -891,6 +1083,49 @@ onMounted(load);
                 <button type="button" class="btn gh" @click="driverOpen = false">Annuler</button>
                 <div style="flex: 1 1 0%" />
                 <button type="button" class="btn pr" @click="saveDriver"><BoIcon name="check" :size="16" />{{ editingDriver ? 'Enregistrer' : 'Ajouter le chauffeur' }}</button>
+            </template>
+        </BoModal>
+
+        <!-- ============ Véhicule ============ -->
+        <BoModal
+            v-if="vehicleOpen" :title="editingVehicle ? 'Modifier le véhicule' : 'Ajouter un véhicule'" icon="bus" :width="620"
+            :sub="editingVehicle ? editingVehicle.plate : 'Il pourra ensuite être affecté à une ligne'" @close="vehicleOpen = false"
+        >
+            <div class="frm">
+                <div class="fld" :class="{ bad: plateBad }">
+                    <label for="vehicle-plate">Immatriculation *</label>
+                    <input id="vehicle-plate" v-model="vehicleForm.plate" placeholder="Ex. AB 1234 CI" maxlength="16" />
+                </div>
+                <div class="fld">
+                    <label for="vehicle-model">Marque et modèle</label>
+                    <input id="vehicle-model" v-model="vehicleForm.model" placeholder="Ex. Toyota Coaster" maxlength="64" />
+                </div>
+                <div class="fld">
+                    <label for="vehicle-kind">Type</label>
+                    <select id="vehicle-kind" v-model="vehicleForm.kind" @change="onKindChange">
+                        <option v-for="k in VEHICLE_KINDS" :key="k.value" :value="k.value">{{ k.label }}</option>
+                    </select>
+                </div>
+                <div class="fld">
+                    <label for="vehicle-capacity">Nombre de places</label>
+                    <select id="vehicle-capacity" v-model.number="vehicleForm.capacity">
+                        <option v-for="c in vehicleCapacities" :key="c" :value="c">{{ c }} places</option>
+                    </select>
+                </div>
+                <div class="fld" :class="{ bad: insuranceBad }">
+                    <label for="vehicle-insurance">Fin d’assurance *</label>
+                    <NelimaDateField id="vehicle-insurance" v-model="vehicleForm.insuranceExpiry" />
+                </div>
+                <div class="fld">
+                    <label for="vehicle-visit">Prochaine visite technique</label>
+                    <NelimaDateField id="vehicle-visit" v-model="vehicleForm.technicalVisit" />
+                </div>
+            </div>
+            <p style="margin: 14px 0 0; font: 500 12px / 1.5 Inter; color: var(--tx3)">Une alerte est envoyée à la direction 30 jours avant la fin d’assurance et la visite technique.</p>
+            <template #footer>
+                <button type="button" class="btn gh" @click="vehicleOpen = false">Annuler</button>
+                <div style="flex: 1 1 0%" />
+                <button type="button" class="btn pr" :disabled="savingVehicle" @click="saveVehicle"><BoIcon name="check" :size="16" />{{ editingVehicle ? 'Enregistrer' : 'Ajouter le véhicule' }}</button>
             </template>
         </BoModal>
 

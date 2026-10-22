@@ -8,11 +8,26 @@
 withDefaults(defineProps<{ title: string; sub?: string | null; icon?: string; width?: number }>(), { width: 640 });
 const emit = defineEmits<{ close: [] }>();
 
+/**
+ * Fenêtres ouvertes, de la plus ancienne à la plus récente : Échap ne ferme que celle du dessus,
+ * comme dans la maquette — ajouter un chauffeur depuis la création d'une ligne ne doit pas
+ * fermer la ligne en cours de saisie.
+ */
+const stack: symbol[] = ((globalThis as any).__boModalStack ??= []);
+const id = Symbol('modal');
+
 function onKey(event: KeyboardEvent) {
-    if (event.key === 'Escape') emit('close');
+    if (event.key === 'Escape' && stack[stack.length - 1] === id) emit('close');
 }
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+onMounted(() => {
+    stack.push(id);
+    window.addEventListener('keydown', onKey);
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', onKey);
+    const index = stack.indexOf(id);
+    if (index >= 0) stack.splice(index, 1);
+});
 </script>
 
 <template>

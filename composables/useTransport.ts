@@ -26,12 +26,28 @@ export const LICENSE_CATEGORIES = [
     { value: 'B', label: 'B · minibus ≤ 9 places' },
 ];
 
+/** Types de véhicule, libellés de la maquette. */
+export const VEHICLE_KINDS = [
+    { value: 'CAR', label: 'Car scolaire', short: 'Car' },
+    { value: 'MINIBUS', label: 'Minibus ≤ 9 places', short: 'Minibus' },
+] as const;
+export type VehicleKind = (typeof VEHICLE_KINDS)[number]['value'];
+
+export type TransportVehicle = {
+    id: string; plate: string; kind: VehicleKind; model?: string | null; capacity: number;
+    insuranceExpiry?: string | null; technicalVisit?: string | null; active: boolean; lines: string[];
+};
+export type VehicleBody = {
+    plate: string; kind: VehicleKind; model?: string | null; capacity: number;
+    insuranceExpiry: string; technicalVisit?: string | null; active: boolean;
+};
+
 export type TransportStop = {
     id?: string; position?: number; name: string; pickupTime?: string | null;
     latitude?: number | null; longitude?: number | null; riders?: number;
 };
 export type TransportLine = {
-    id: string; name: string; itinerary: string; vehiclePlate?: string | null; capacity: number;
+    id: string; name: string; itinerary: string; vehicleId?: string | null; vehiclePlate?: string | null; capacity: number;
     driverId?: string | null; driverName?: string | null; driverPhone?: string | null;
     morningDeparture?: string | null; eveningDeparture?: string | null; days: string[];
     attendant?: string | null; startDate?: string | null; monthlyPrice: number; active: boolean;
@@ -51,7 +67,7 @@ export type TransportRider = {
     pickupTime?: string | null; startDate: string; endDate?: string | null; paymentStatus: PaymentStatus;
 };
 export type LineBody = {
-    name: string; vehiclePlate?: string | null; capacity: number; driverId?: string | null;
+    name: string; vehicleId?: string | null; vehiclePlate?: string | null; capacity?: number | null; driverId?: string | null;
     morningDeparture?: string | null; eveningDeparture?: string | null; days: string[]; attendant?: string | null;
     startDate?: string | null; announce?: boolean; monthlyPrice: number; active: boolean; stops: TransportStop[];
 };
@@ -72,6 +88,9 @@ export function useTransport() {
         updateLine: (id: string, body: LineBody) => api<TransportLine>(`/transport/lines/${id}`, { method: 'PUT', body }),
         setStatus: (id: string, body: { status: LineStatus; delayMinutes?: number | null; note?: string | null; notifyFamilies?: boolean | null }) =>
             api<TransportLine>(`/transport/lines/${id}/status`, { method: 'PUT', body }),
+        vehicles: () => api<TransportVehicle[]>('/transport/vehicles'),
+        createVehicle: (body: VehicleBody) => api<TransportVehicle>('/transport/vehicles', { method: 'POST', body }),
+        updateVehicle: (id: string, body: VehicleBody) => api<TransportVehicle>(`/transport/vehicles/${id}`, { method: 'PUT', body }),
         drivers: () => api<TransportDriver[]>('/transport/drivers'),
         createDriver: (body: DriverBody) => api<TransportDriver>('/transport/drivers', { method: 'POST', body }),
         updateDriver: (id: string, body: DriverBody) => api<TransportDriver>(`/transport/drivers/${id}`, { method: 'PUT', body }),
