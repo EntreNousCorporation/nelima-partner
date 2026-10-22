@@ -6,6 +6,7 @@ import {
 
 const { installments, collectOffline, receipts } = useBilling();
 const { search: searchStudents } = useStudents();
+const { can } = usePermissions();
 
 const pending = ref<Installment[]>([]);
 const loading = ref(true);
@@ -169,6 +170,8 @@ async function submit() {
 }
 
 /* ---- Caisse du jour ---- */
+/** Sans la comptabilité, la caisse du jour est celle de l'agent : ses propres encaissements. */
+const ownCashOnly = computed(() => !can('accounting:read') && !can('fee:read'));
 const dayReceipts = ref<Receipt[]>([]);
 
 const midnight = () => {
@@ -196,11 +199,12 @@ async function load() {
     try {
         const start = midnight();
         const end = new Date(start.getTime() + 86_400_000);
+        // Indépendants : une caisse du jour illisible ne doit pas empêcher d'encaisser.
         const [due, issuedToday] = await Promise.all([
             installments({ status: 'PENDING', size: 200 }),
             receipts({
                 issuedFrom: start.toISOString(), issuedTo: end.toISOString(), size: 200,
-            }),
+            }).catch(() => ({ content: [] as Receipt[] })),
         ]);
         pending.value = due.content ?? [];
         dayReceipts.value = issuedToday.content ?? [];
@@ -431,7 +435,7 @@ onMounted(async () => {
 
             <UiCard
                 style="grid-column: span 7" :pad="false"
-                title="Caisse du jour" :sub="todayLabel"
+                title="Caisse du jour" :sub="ownCashOnly ? `${todayLabel} · vos encaissements` : todayLabel"
             >
                 <template #action>
                     <NuxtLink to="/app/paiements/recus" class="btn-secondary btn-sm">Historique</NuxtLink>
