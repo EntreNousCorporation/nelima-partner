@@ -32,6 +32,10 @@ const GUARDS: [string, string[]][] = [
 export default defineNuxtRouteMiddleware((to) => {
     const auth = useAuthStore();
     if (!auth.user || !to.path.startsWith('/app')) return;
+    // « Tous les sites » est à la direction du groupe seule, quelle que soit sa comptabilité.
+    if ((to.path === '/app/groupe' || to.path.startsWith('/app/groupe/')) && !auth.user.groupWide) {
+        return navigateTo('/app', { replace: true });
+    }
     const guard = GUARDS.find(([prefix]) => to.path === prefix || to.path.startsWith(`${prefix}/`));
     if (!guard) return;
     const { canAny } = usePermissions();

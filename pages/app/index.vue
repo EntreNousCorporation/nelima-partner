@@ -605,7 +605,7 @@ onMounted(loadExtras);
                     tip="Effectif rapporté à la capacité de la salle. En orange au-delà de 92 %, en rouge en cas de dépassement."
                 >
                     <template #action>
-                        <NuxtLink to="/app/classes" class="btn-secondary btn-sm">Gérer</NuxtLink>
+                        <NuxtLink v-if="can('class:read')" to="/app/classes" class="btn-secondary btn-sm">Gérer</NuxtLink>
                     </template>
 
                     <!-- Répartition filles/garçons : les états scolaires la demandent.

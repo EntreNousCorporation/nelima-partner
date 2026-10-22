@@ -454,8 +454,9 @@ onMounted(async () => {
             <button
                 :aria-current="tab === 'directory' ? 'page' : undefined" @click="tab = 'directory'"
             >Annuaire</button>
+            <!-- Les affectations relèvent des classes : sans elles, l'onglet n'a pas lieu d'être. -->
             <button
-                :aria-current="tab === 'assignments' ? 'page' : undefined"
+                v-if="can('class:read')" :aria-current="tab === 'assignments' ? 'page' : undefined"
                 @click="tab = 'assignments'"
             >Affectations</button>
             <button
