@@ -268,6 +268,13 @@ const subscribing = ref(false);
 let debounce: ReturnType<typeof setTimeout> | undefined;
 
 const activeFormulas = computed(() => formulas.value.filter((f) => f.active));
+/** Ce qui manque pour inscrire, dit à côté du bouton grisé plutôt que laissé à deviner. */
+const subscribeBlocker = computed(() => {
+    if (!picked.value) return 'Choisissez un élève';
+    if (!activeFormulas.value.length) return 'Créez d’abord une formule';
+    if (!pickedFormula.value) return 'Choisissez une formule';
+    return '';
+});
 const chosenFormula = computed(() => formulas.value.find((f) => f.id === pickedFormula.value));
 
 async function findCandidates(value: string) {
@@ -698,7 +705,16 @@ onMounted(() => Promise.all([load(), loadMenu()]));
                         <em class="nu">{{ fmt(f.mealPrice ?? f.monthlyPrice) }} F <small>/ {{ f.mealPrice != null ? 'repas' : 'mois' }}</small></em>
                     </button>
                 </div>
-                <p v-else style="margin: 0; font: 500 12.5px / 1.45 Inter; color: var(--tx3)">Aucune formule : créez-en une avec « Gérer les formules ».</p>
+                <!-- Sans formule, pas d'inscription : la formule porte les jours et le tarif. Une ligne grise
+                     ne suffisait pas, le bouton « Inscrire » restait grisé sans qu'on comprenne pourquoi. -->
+                <BoBanner
+                    v-else tone="warn" icon="utensils" title="Aucune formule de cantine"
+                    text="Créez d’abord une formule (jours servis et tarif) : l’inscription d’un élève s’appuie sur elle."
+                >
+                    <template #action>
+                        <button v-if="can('canteen:write')" type="button" class="btn pr sm" @click="editFormula(); formulasOpen = true"><BoIcon name="plus" :size="15" />Créer une formule</button>
+                    </template>
+                </BoBanner>
                 <div class="frm" style="margin-top: 12px">
                     <div class="fld">
                         <label for="canteen-start">Premier repas</label>
@@ -769,7 +785,8 @@ onMounted(() => Promise.all([load(), loadMenu()]));
             </div>
             <template #footer>
                 <button type="button" class="btn gh" @click="subscribeOpen = false">Annuler</button>
-                <button type="button" class="btn pr" :disabled="!picked || !pickedFormula || subscribing" @click="subscribe"><BoIcon name="check" :size="16" />Inscrire</button>
+                <span v-if="subscribeBlocker" style="margin-left: auto; font: 600 12px / 1 Inter; color: var(--am-d)">{{ subscribeBlocker }}</span>
+                <button type="button" class="btn pr" :disabled="!!subscribeBlocker || subscribing" @click="subscribe"><BoIcon name="check" :size="16" />Inscrire</button>
             </template>
         </BoModal>
 

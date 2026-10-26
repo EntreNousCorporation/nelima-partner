@@ -13,7 +13,8 @@ const route = useRoute();
  */
 
 /**
- * Les sept onglets du prototype, dans son ordre, avec la permission qui commande l'écran.
+ * Les onglets du prototype, avec la permission qui commande l'écran. « Élèves » suit « Classes »
+ * (retour de test du 23/10) : on passe de la classe à ses élèves.
  *
  * **Ce qui relève du paramétrage n'y figure pas** : les réglages s'ouvrent par l'icône de la barre
  * supérieure, et les niveaux enseignés y sont devenus une section. Un réglage rangé à deux
@@ -28,10 +29,10 @@ const allTabs = [
     { label: 'Paiements', to: '/app/paiements', icon: 'wallet', permission: ['fee:read', 'collection:write'] },
     { label: 'Calendrier', to: '/app/calendrier', icon: 'calendar', permission: 'calendar:read' },
     { label: 'Classes', to: '/app/classes', icon: 'layers', permission: 'class:read' },
+    { label: 'Élèves', to: '/app/eleves', icon: 'students', permission: 'student:read' },
     { label: 'Activités', to: '/app/activites', icon: 'ball', permission: 'activity:read' },
     { label: 'Cantine', to: '/app/cantine', icon: 'utensils', permission: 'canteen:read' },
     { label: 'Transport', to: '/app/transport', icon: 'bus', permission: 'transport:read' },
-    { label: 'Élèves', to: '/app/eleves', icon: 'students', permission: 'student:read' },
     { label: 'Familles', to: '/app/parents', icon: 'user', permission: 'student:read' },
     { label: 'Personnel', to: '/app/personnel', icon: 'briefcase', permission: 'staff:read' },
 ];
