@@ -18,6 +18,10 @@ export default defineNuxtConfig({
     css: ['~/assets/css/main.css', '~/assets/css/bo-mockup.css'],
 
     primevue: {
+        // Aucun composant PrimeVue n'est utilisé : l'interface repose sur Tailwind et les
+        // variables CSS de Nelima. Chargés, les styles du thème Aura (≈ 440 Ko, 184 balises
+        // <style>) étaient injectés dans le HTML de chaque page rendue côté serveur.
+        loadStyles: false,
         options: {
             theme: { preset: Aura, options: { darkModeSelector: '.dark' } },
             ripple: true,
