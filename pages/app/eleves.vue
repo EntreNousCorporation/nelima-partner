@@ -383,7 +383,7 @@ onMounted(async () => {
                     En-tête exact attendu :
                     <code class="text-[11.5px]">matricule;nom;prenom;date_naissance;lieu_naissance;niveau;sexe;classe</code><br />
                     Les dates s'écrivent JJ-MM-AAAA — <code class="text-[11.5px]">14-09-2015</code> —,
-                    et le niveau doit être l'un de ceux que vous avez déclarés.
+                    et le niveau doit être l'un de ceux que vous avez déclarés, écrit comme il s'affiche (« 4ème », « CP1 »…).
                     <strong>Les colonnes « sexe » et « classe » sont facultatives.</strong>
                     Le sexe s'écrit <code class="text-[11.5px]">M</code> ou
                     <code class="text-[11.5px]">F</code> — « garçon » et « fille » en toutes lettres
