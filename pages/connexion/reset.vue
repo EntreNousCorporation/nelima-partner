@@ -60,7 +60,7 @@ async function submit() {
                 <p class="page-subtitle mb-8">
                     Ouvrez le lien tel qu'il figure dans le courriel, sans le recopier à la main.
                 </p>
-                <NuxtLink to="/connexion/oubli" class="btn-primary w-full text-center block">
+                <NuxtLink to="/connexion/oubli" class="btn-primary w-full flex">
                     Recevoir un nouveau lien
                 </NuxtLink>
             </template>
@@ -70,7 +70,7 @@ async function submit() {
                 <p class="page-subtitle mb-8">
                     Vous pouvez maintenant vous connecter avec <strong>{{ username }}</strong>.
                 </p>
-                <NuxtLink to="/connexion" class="btn-primary w-full text-center block">
+                <NuxtLink to="/connexion" class="btn-primary w-full flex">
                     Aller à la connexion
                 </NuxtLink>
             </template>

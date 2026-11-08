@@ -43,7 +43,7 @@ async function submit() {
                     Si un compte existe pour <strong>{{ username }}</strong>, un lien de définition
                     de mot de passe vient de partir. Il est valable une heure.
                 </p>
-                <NuxtLink to="/connexion" class="btn-primary w-full text-center block">
+                <NuxtLink to="/connexion" class="btn-primary w-full flex">
                     Retour à la connexion
                 </NuxtLink>
             </template>
